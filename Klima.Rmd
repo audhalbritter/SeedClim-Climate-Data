@@ -1,0 +1,114 @@
+---
+title: "SeedClim Climate"
+author: "Richard J. Telford"
+date: '2016-04-29'
+output: ioslides_presentation
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path='Figs/', echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+```{r importChunk, results = "hide", fig.keep='none', cache = TRUE}
+source("klima.R")
+```
+
+```{r packages}
+library(ggplot2)
+library(plyr)
+library(reshape2)
+library(lubridate)
+```
+## Data
+
+Loggers
+
+ - temperature 2m
+ - temperature 30cm
+ - temperature surface
+ - temperature soil
+ - soil moisture
+ - precipitation
+
+Gridded data from met.no
+
+ - 48 GB of temperature data
+ - precipitation data 
+
+
+## Precipitation data needs careful cleaning
+
+```{r precipitationChunk}
+ggplot(clim[[12]], aes(x = date, y = precip)) + geom_path() + ggtitle("Vikesland")
+```
+
+## Alrust {.smaller}
+```{r longSeriesChunk}
+  clim1a <- melt(clim[[1]], id.vars = c("Site", "date"), measure.vars = c("temp2m", "temp30cm", "tempGroundGrass", "tempSoil"))
+  g <- ggplot(clim1a, aes(x = date, y = value, colour = variable)) + geom_line() + labs(y = "Temperature °C")
+print(g)
+
+```
+<div class="columns-2">
+ - Missing data
+ - Unearthed Soil temperature loggers
+ - Occasional spurious readings
+</div>
+
+
+## Daily cycles
+
+```{r dailyCyclesChunk}
+g <- ggplot(subset(clim1, year(date) == 2013 & month(date) == 7), aes(x = hour(date) + minute(date)/60, y = value, colour = variable, group = factor(day(date)))) + geom_path() + labs(x = "Time, hours", y = "Temperature °C") + facet_wrap(~variable)
+print(g)
+```
+
+## Daily Differences from 2m temperature
+
+Alrust July 2013
+```{r dailyDeltaChunk}
+g <- ggplot(subset(clim1d, year(date) == 2013 & month(date) == 7 & variable != "temp2m"), aes(x = hour(date) + minute(date)/60, y = value, colour = variable, group = factor(day(date)))) + geom_path() + labs(x = "Time, hours", y = "Temperature °C")+ facet_wrap(~variable)
+print(g)
+```
+
+
+
+## Across the grid
+
+July Temperatures
+```{r, echo = FALSE, message = FALSE, warning=FALSE }
+g <- ggplot(subset(climMeans, format(date, "%b") == "Jul"), aes(x = year(date), y = temp2m, colour = site)) + geom_line() + sc + labs(x = "Year", y = "Temperature °C")
+print(g)
+```
+
+## Across the grid
+
+August Temperatures
+```{r, echo = FALSE, message = FALSE, warning=FALSE }
+g <- ggplot(subset(climMeans, format(date, "%b") == "Aug"), aes(x = year(date), y = temp2m, colour = site)) + geom_line() + sc + labs(x = "Year", y = "Temperature °C")
+print(g)
+```
+
+## Month mean differences 2m - 30cm
+
+```{r, echo = FALSE, message = FALSE, warning=FALSE }
+ggplot(climMeans, aes(x = temp2m, y = temp30cm, colour = site)) + geom_point() + geom_abline(slope = 1, intercept = 0) + sc + labs(x = "2 m Temperature °C", y = "30 cm Temperature °C")
+```
+<div class="columns-2">
+- snow
+ - radiation frost
+ - data issues
+</div>
+
+
+## delta 30-2m for all sites
+
+```{r, echo = FALSE, warning=FALSE}
+clim1 <- ldply(clim, function(x){
+    x$delta30 <- x$temp30cm - x$temp2m
+    x
+})
+  
+  clim1m <- melt(clim1[,c(2:4, 19)], id = c("Site", "date"))
+  g <-ggplot(subset(clim1m,  month(date) == 7 & variable == "delta30"), aes(x = hour(date) + minute(date)/60, y = as.numeric(value), colour = factor(year(date)), group = format(date, "%d-%m-%Y"))) + geom_path() + labs(x = "Time, hours", y = "Temperature °C") + facet_wrap(~Site) + scale_colour_discrete(name = "Year")
+print(g)
+```
