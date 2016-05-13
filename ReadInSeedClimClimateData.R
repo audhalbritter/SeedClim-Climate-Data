@@ -29,4 +29,4 @@ unique(ddd$site)
 
 # fix Temp1 -> temp1 tolower("X")
 table(subset(climate, logger == "P", site))
-
+tolower("Temp1")

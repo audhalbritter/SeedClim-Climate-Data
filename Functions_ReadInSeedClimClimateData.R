@@ -50,6 +50,7 @@ ReadInBodyITAS <- function(textfile){
   attr(dat, "type") <- "ITAS" # give each file an attribute
   dat <- melt(dat, id=c("date"))
   colnames(dat)[2] <- "logger"
+  dat$logger <- tolower(dat$logger)
   
   # extract site name from file name
   textfile2 <- basename(textfile)
