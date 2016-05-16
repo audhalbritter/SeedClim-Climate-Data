@@ -18,15 +18,11 @@ head(climate)
 unique(climate$logger)
 table(climate$logger)
 
+# -5cm, P, PØN and "" are UTL loggers with wrong name. Need to be assigned to the right logger
+
 # subset soilmoisture, precipitation and temperatur loggers into seperate object
-temperature <- subset(climate, logger %in% c("temp1", "temp2", "Temp1", "Temp2", "temp200cm", "temp30cm"))
+temperature <- subset(climate, logger %in% c("temp1", "temp2", "temp200cm", "temp30cm", "", "PØN", "P", "-5cm"))
 precipitation <- subset(climate, logger %in% c("Nedbor", "counter"))
 soilmoisture <- subset(climate, logger %in% c("Jordf1", "Jordf2"))
 
-ddd <- subset(climate, logger == "P")
-tail(ddd)
-unique(ddd$site)
 
-# fix Temp1 -> temp1 tolower("X")
-table(subset(climate, logger == "P", site))
-tolower("Temp1")

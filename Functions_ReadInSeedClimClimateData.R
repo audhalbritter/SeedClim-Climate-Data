@@ -64,7 +64,7 @@ head(ddd)
 
 
 ##### READ IN UTL LOGGERS ####
-ReadInBodyUTL <- function(textfile, SITE){
+ReadInBodyUTL <- function(textfile, SITE){browser()
   #find sample
   f <- readLines(textfile, n = 30)
   skip <- which(f == "Sample")
@@ -84,7 +84,7 @@ ReadInBodyUTL <- function(textfile, SITE){
   
   # import head of data to extract logger name
   dat.h <- read.csv(textfile, sep="\t", header=FALSE, nrow=15)
-  temp.logger <- gsub(" ", "",dat.h$V2[4], fixed=TRUE) #extract logger: 30cm or 200cm
+  temp.logger <- gsub(" ", "",dat.h$V2[4], fixed=TRUE) #extract logger: 30cm or 200cm, delete space between nr and unit
   
   # give a warning if logger name is wrong
   if(!temp.logger %in% c("200cm", "30cm")){
@@ -106,7 +106,7 @@ ReadInBodyUTL <- function(textfile, SITE){
   attr(dat, "type") <- "UTL" # give each file an attribute
   dat
 }
-ddd <- ReadInBodyUTL("#001035_20080924_1000.txt")
+ddd <- ReadInBodyUTL("#001068_20090419_1600.txt")
 head(ddd)
 
 
@@ -137,8 +137,9 @@ ImportData <- function(site){
   mdat <- ldply(as.list(myfiles), ReadData)
   mdat
 }
-ddd <- ImportData("Skj")
+ddd <- ImportData("Arh")
 head(ddd)
+unique(ddd$logger)
 
 
 #############################################################################################################
