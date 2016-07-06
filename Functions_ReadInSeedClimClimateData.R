@@ -102,7 +102,7 @@ ReadInBodyUTL <- function(textfile, SITE){
   dat$logger <- t.name
   colnames(dat)[colnames(dat)=="temp"] <- "value"
   dat$site <- dat.h$V2[3] # extract site
-  if(dat$site == "" | dat$site == " " ){
+  if(dat$site[1] == "" | dat$site[1] == " " ){
     dat$site <- SITE
     warning(paste("site imputed for", SITE, basename(textfile)))
   }
