@@ -10,16 +10,20 @@ library(reshape2)
 
 #### NAME CHECK FUNCTION ####
 NameCheck <- function(site, textfile){
+  print(Encoding(site))
   site <- substr(site, 1,3)
   site <- gsub('(^)([[:alpha:]])','\\1\\U\\2\\', site, perl = TRUE)
-  if(site %in% c("Aal", "Ålr", "Ål")) site <- "Alr"
-  if(site %in% c("Arn")) site <- "Arh"
-  if(site %in% c("Høg")) site <- "Hog"
-  if(site %in% c("Låv")) site <- "Lav"
-  if(site %in% c("Øvs")) site <- "Ovs"
-  if(site %in% c("Ule")) site <- "Ulv"
-  
-  #check
+  if(site %in% c("Aal", "Ålr", "Ål")) {
+    site <- "Alr"
+  }
+  if(site %in% c("Arn")) {site <- "Arh"}
+  if(site %in% c("Høg")) {site <- "Hog"}
+  if(site %in% c("Låv")) {site <- "Lav"}
+  if(site %in% c("Øvs")) {site <- "Ovs"}
+  if(site %in% c("Ule")) {site <- "Ulv"}
+  cat(" ")
+  cat(site)
+    #check
   if(!site %in% c("Fau", "Alr", "Ulv", "Vik", "Hog", "Lav", "Arh", "Ram", "Gud", "Ovs", "Ves", "Skj"))stop(paste("site is ", site, "from", textfile))
   site
 }
@@ -58,32 +62,32 @@ ReadInBodyITAS <- function(textfile){
   dat$site <- NameCheck(textfile2, textfile2) # check the site name
   dat
 }
-ddd <- ReadInBodyITAS("Skjeldingahaugen_ITAS_111015_120705.txt")
-head(ddd)
+# ddd <- ReadInBodyITAS("Skjeldingahaugen_ITAS_111015_120705.txt")
+# head(ddd)
 
 
 
 ##### READ IN UTL LOGGERS ####
-ReadInBodyUTL <- function(textfile, SITE){browser()
+ReadInBodyUTL <- function(textfile, SITE){
   #find sample
   f <- readLines(textfile, n = 30)
   skip <- which(f == "Sample")
   if(length(skip) != 1)stop(paste("no Sample", textfile))
   # import body of data, without header
-  dat <- read.table(textfile, header=FALSE, sep="\t", skip=skip, dec=",")
+  dat <- read.table(textfile, header=FALSE, sep="\t", skip=skip, dec=",", stringsAsFactors = FALSE)
   if(ncol(dat) == 1){
-    dat <- read.table(textfile, header=FALSE, sep=" ", skip=skip, dec=",")
-    dat <- data.frame(paste(dat[, 1], dat[, 2]), dat[, 3])
+    dat <- read.table(textfile, header=FALSE, sep=" ", skip=skip, dec=",", stringsAsFactors = FALSE)
+    dat <- data.frame(paste(dat[, 1], dat[, 2]), dat[, 3], stringsAsFactors = FALSE)
   }
   if(ncol(dat) == 3){
-    dat <- data.frame(paste(dat[, 1], dat[, 2], sep=" "), dat[, 3])
+    dat <- data.frame(paste(dat[, 1], dat[, 2], sep=" "), dat[, 3], stringsAsFactors = FALSE)
   }
   colnames(dat) <- c("date", "temp")
   dat$date <- ymd_hms(dat$date, tz = "Africa/Algiers") # define dates
   dat$temp <- as.numeric(dat$temp)
   
   # import head of data to extract logger name
-  dat.h <- read.csv(textfile, sep="\t", header=FALSE, nrow=15)
+  dat.h <- read.csv(textfile, sep="\t", header=FALSE, nrow=15, stringsAsFactors = FALSE)
   temp.logger <- gsub(" ", "",dat.h$V2[4], fixed=TRUE) #extract logger: 30cm or 200cm, delete space between nr and unit
   
   # give a warning if logger name is wrong
@@ -98,48 +102,48 @@ ReadInBodyUTL <- function(textfile, SITE){browser()
   dat$logger <- t.name
   colnames(dat)[colnames(dat)=="temp"] <- "value"
   dat$site <- dat.h$V2[3] # extract site
-  if(site == "" | site == " " ){
-    site <- SITE
+  if(dat$site == "" | dat$site == " " ){
+    dat$site <- SITE
     warning(paste("site imputed for", SITE, basename(textfile)))
   }
-  dat$site <- NameCheck(site, textfile)
+  dat$site <- NameCheck(dat$site[1], textfile)
   attr(dat, "type") <- "UTL" # give each file an attribute
   dat
 }
-ddd <- ReadInBodyUTL("#001068_20090419_1600.txt")
-head(ddd)
+# ddd <- ReadInBodyUTL("#001068_20090419_1600.txt")
+# head(ddd)
 
 
 #### Read in ITAS or UTL ####
-ReadData <- function(textfile){
+ReadData <- function(textfile, site){
   # print(textfile)
   first <- substring(readLines(textfile, n = 1), 1, 5) # read first line to check which logger it is
   if(first == "Label"){ #check format based on first line
     dat <- ReadInBodyITAS(textfile)
   } else if(first=="Versi"){
-    dat <- ReadInBodyUTL(textfile)
+    dat <- ReadInBodyUTL(textfile, site)
   } else {
     warning(paste(textfile, "format not recognised")) # warning if logger not recognized
     dat <- NULL
   }
   dat
 }
-ddd <- ReadData("#001035_20080924_1000.txt")
-head(ddd)
+# ddd <- ReadData("#001035_20080924_1000.txt")
+# head(ddd)
 
 
 #### IMPORT DATA PER SITE ####
 ImportData <- function(site){
   # Define directory (recursive = true reads subdirectories)
-  myfiles <- dir(path = paste0("/Users/audhalbritter/Dropbox/seedclim klimadaten/rawdata by Site/",site), pattern = "txt", recursive = TRUE, full.names = TRUE)
+  myfiles <- dir(path = paste0("/Users/audhalbritter/Dropbox/seedclim klimadaten/rawdata by Site/", site), pattern = "txt", recursive = TRUE, full.names = TRUE)
   
   # make a list of textfiles
-  mdat <- ldply(as.list(myfiles), ReadData)
+  mdat <- ldply(as.list(myfiles), ReadData, site = site)
   mdat
 }
-ddd <- ImportData("Arh")
-head(ddd)
-unique(ddd$logger)
+# ddd <- ImportData("Arh")
+# head(ddd)
+
 
 
 #############################################################################################################
@@ -172,8 +176,8 @@ ReadInMetaDataITAS <- function(textfile, SITE){
   attr(meta.dat, "type") <- "ITAS" # give each file an attribute
   meta.dat
 }
-ddd <- ReadInMetaDataITAS("Aalrust_klima 20150527-20151008.txt")
-ddd
+# ddd <- ReadInMetaDataITAS("Aalrust_klima 20150527-20151008.txt")
+# ddd
 
 
 ####  READ IN META DATA UTL LOGGERS ####
@@ -194,8 +198,8 @@ ReadInMetaDataUTL <- function(textfile, SITE){
   attr(meta.dat, "type") <- "UTL" # give each file an attribute
   meta.dat
 }
-ddd <- ReadInMetaDataUTL("#001035_20080924_1000.txt")
-head(ddd)
+# ddd <- ReadInMetaDataUTL("#001035_20080924_1000.txt")
+# head(ddd)
 
 
 
@@ -213,8 +217,8 @@ ReadMetadata <- function(textfile, SITE){
   }
   dat
 }
-ddd <- ReadMetadata("Aalrust_klima 20150527-20151008.txt")
-ddd
+# ddd <- ReadMetadata("Aalrust_klima 20150527-20151008.txt")
+# ddd
 
 
 #### IMPORT METADATA ####
@@ -235,5 +239,5 @@ ImportMetadata <- function(site){
   all.ITAS <- do.call(rbind, c(dat.ITAS, dat.UTL))
   all.ITAS
 }
-ddd <- ImportMetadata("Skj")
-ddd
+# ddd <- ImportMetadata("Skj")
+# ddd
