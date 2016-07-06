@@ -63,9 +63,6 @@ ReadInBodyITAS <- function(textfile){
   dat$site <- NameCheck(textfile2, textfile2) # check the site name
   dat
 }
-# ddd <- ReadInBodyITAS("Skjeldingahaugen_ITAS_111015_120705.txt")
-# head(ddd)
-
 
 
 ##### READ IN UTL LOGGERS ####
@@ -111,8 +108,6 @@ ReadInBodyUTL <- function(textfile, SITE){
   attr(dat, "type") <- "UTL" # give each file an attribute
   dat
 }
-# ddd <- ReadInBodyUTL("#001068_20090419_1600.txt")
-# head(ddd)
 
 
 #### Read in ITAS or UTL ####
@@ -129,8 +124,6 @@ ReadData <- function(textfile, site){
   }
   dat
 }
-# ddd <- ReadData("#001035_20080924_1000.txt")
-# head(ddd)
 
 
 #### IMPORT DATA PER SITE ####
@@ -142,8 +135,6 @@ ImportData <- function(site){
   mdat <- ldply(as.list(myfiles), ReadData, site = site)
   mdat
 }
-# ddd <- ImportData("Arh")
-# head(ddd)
 
 
 
@@ -177,8 +168,6 @@ ReadInMetaDataITAS <- function(textfile, SITE){
   attr(meta.dat, "type") <- "ITAS" # give each file an attribute
   meta.dat
 }
-# ddd <- ReadInMetaDataITAS("Aalrust_klima 20150527-20151008.txt")
-# ddd
 
 
 ####  READ IN META DATA UTL LOGGERS ####
@@ -199,8 +188,6 @@ ReadInMetaDataUTL <- function(textfile, SITE){
   attr(meta.dat, "type") <- "UTL" # give each file an attribute
   meta.dat
 }
-# ddd <- ReadInMetaDataUTL("#001035_20080924_1000.txt")
-# head(ddd)
 
 
 
@@ -218,8 +205,6 @@ ReadMetadata <- function(textfile, SITE){
   }
   dat
 }
-# ddd <- ReadMetadata("Aalrust_klima 20150527-20151008.txt")
-# ddd
 
 
 #### IMPORT METADATA ####
@@ -240,5 +225,3 @@ ImportMetadata <- function(site){
   all.ITAS <- do.call(rbind, c(dat.ITAS, dat.UTL))
   all.ITAS
 }
-# ddd <- ImportMetadata("Skj")
-# ddd
