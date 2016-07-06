@@ -10,19 +10,16 @@ library(reshape2)
 
 #### NAME CHECK FUNCTION ####
 NameCheck <- function(site, textfile){
-  print(Encoding(site))
   site <- substr(site, 1,3)
   site <- gsub('(^)([[:alpha:]])','\\1\\U\\2\\', site, perl = TRUE)
-  if(site %in% c("Aal", "Ålr", "Ål")) {
+  if(site %in% c("Aal", "Ålr", "Ål")||grepl(".lr", site)) {
     site <- "Alr"
   }
   if(site %in% c("Arn")) {site <- "Arh"}
-  if(site %in% c("Høg")) {site <- "Hog"}
-  if(site %in% c("Låv")) {site <- "Lav"}
-  if(site %in% c("Øvs")) {site <- "Ovs"}
+  if(grepl("H.g", site)) {site <- "Hog"}
+  if(grepl("L.v", site)) {site <- "Lav"}
+  if(grepl(".vs", site)) {site <- "Ovs"}
   if(site %in% c("Ule")) {site <- "Ulv"}
-  cat(" ")
-  cat(site)
     #check
   if(!site %in% c("Fau", "Alr", "Ulv", "Vik", "Hog", "Lav", "Arh", "Ram", "Gud", "Ovs", "Ves", "Skj"))stop(paste("site is ", site, "from", textfile))
   site
@@ -58,7 +55,7 @@ ReadInBodyITAS <- function(textfile){
   
   # extract site name from file name
   textfile2 <- basename(textfile)
-  textfile2 <- enc2utf8(gsub("ITAS ", "", textfile2))
+  textfile2 <- gsub("ITAS ", "", textfile2)
   dat$site <- NameCheck(textfile2, textfile2) # check the site name
   dat
 }
@@ -87,7 +84,7 @@ ReadInBodyUTL <- function(textfile, SITE){
   dat$temp <- as.numeric(dat$temp)
   
   # import head of data to extract logger name
-  dat.h <- read.csv(textfile, sep="\t", header=FALSE, nrow=15, stringsAsFactors = FALSE)
+  dat.h <- read.csv(textfile, sep="\t", header=FALSE, nrow=15, stringsAsFactors = FALSE, fileEncoding = "UTF-8")
   temp.logger <- gsub(" ", "",dat.h$V2[4], fixed=TRUE) #extract logger: 30cm or 200cm, delete space between nr and unit
   
   # give a warning if logger name is wrong
