@@ -135,7 +135,7 @@ ReadData <- function(textfile, site){
 #### IMPORT DATA PER SITE ####
 ImportData <- function(site){
   # Define directory (recursive = true reads subdirectories)
-  myfiles <- dir(path = paste0("~/Dropbox/seedclim klimadaten/rawdata by Site", site), pattern = "txt", recursive = TRUE, full.names = TRUE)
+  myfiles <- dir(path = paste0("~/Dropbox/seedclim klimadaten/rawdata by Site/", site), pattern = "txt", recursive = TRUE, full.names = TRUE)
   
   # make a list of textfiles
   mdat <- ldply(as.list(myfiles), ReadData, site = site)
