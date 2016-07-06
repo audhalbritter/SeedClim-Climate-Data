@@ -37,17 +37,21 @@ ReadInBodyITAS <- function(textfile){
   
   # some files have an extra time column (less than 15 characters)
   if(nchar(dat$Label[1]) <= 15){
-    date <- paste(strsplit(dat$Label[1], " ")[[1]][1], dat$X[1], sep=" ")
+    date <- paste(sapply(strsplit(dat$Label[1], " "), "[", 1), dat$X, sep=" ")
     dat$X <- NULL
   } else { # for normal files
-    date <- dat$Label[1]
+    date <- dat$Label
   }
   dat[,-1] <- colwise(as.numeric)(dat[,-1]) # remove first column
   
   # convert to date
-  dat$date <- dmy_hms(date, tz = "Africa/Algiers")
-  
-  dat$Label <- NULL # delet first column
+  if(stringi::stri_count(date[1], fixed = ":") == 2){
+    dat$date <- dmy_hms(date, tz = "Africa/Algiers")
+  }else{
+    dat$date <- dmy_hm(date, tz = "Africa/Algiers")
+  }
+
+  dat$Label <- NULL # delete first column
   attr(dat, "type") <- "ITAS" # give each file an attribute
   dat <- melt(dat, id=c("date"))
   colnames(dat)[2] <- "logger"
