@@ -2,8 +2,6 @@
 # READ IN SEEDCLIM CLIMATE DATA
 ####################################
 
-### LIBRARIES
-library(plyr)
 
 #### IMPORT CLIMATE DATA FOR ALL SITES
 climate <- ldply(as.list(c("Fau", "Alr", "Ulv", "Vik", "Hog", "Lav", "Arh", "Ram", "Gud", "Ovs", "Ves", "Skj")), ImportData)

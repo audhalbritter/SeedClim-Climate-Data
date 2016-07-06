@@ -2,9 +2,13 @@
 # READ IN SEEDCLIM CLIMATE DATA
 #          FUNCTIONS
 ####################################
-library(plyr)
-library(lubridate)
-library(reshape2)
+
+### LIBRARIES
+library("plyr")
+library("stringi")
+library("plyr")
+library("lubridate")
+library("reshape2")
 
 #### IMPORT DATA ####
 
