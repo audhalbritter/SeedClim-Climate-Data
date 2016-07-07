@@ -18,5 +18,34 @@ table(temperature$logger, temperature$site)
 table(temperature$logger, year(temperature$date))
 table(temperature$site, year(temperature$date))
 
-plot_climate(end_date = "2010.1.1", log = c("temp1", "temp2"), inc = FALSE, SITE = "Alr")
+plot_climate(start_date = "2008.1.1", end_date = "2017.1.1", log = c("temp1", "temp2"), inc = TRUE, SITE = "Skj")
+
+temperature %>%
+  filter(site == "Hog", logger == "") %>%
+  group_by(file) %>%
+  summarise(n = n(), MIN = min(date), max = max(date))
+  
+
+
+
+#### DATA CLEANING ####
+
+# delete crap data
+temperature <- temperature[!(temperature$site == "Lav" & temperature$logger == "-5cm"),]
+temperature <- temperature[!(temperature$site == "Gud" & temperature$logger == "-5cm"),]
+temperature <- temperature[!(temperature$site == "Ovs" & temperature$logger == "-5cm"),]
+
+
+# rename wrong logger names
+stopifnot ((temperature %>% filter(logger %in% c("", "-5cm", "PØN")) %>% summarise(max(date)))[1,1] < as.POSIXct(ymd("2016.1.1")))
+
+temperature$logger[temperature$logger == "PØN"] <- "temp200cm"
+temperature$logger[temperature$logger == "-5cm"] <- "temp30cm"
+temperature$logger[temperature$file == "1229_30092009.txt"] <- "temp30cm"
+temperature$logger[temperature$file == "2488_21092010.txt"] <- "temp200cm"
+temperature$logger[temperature$logger == ""] <- "temp30cm"
+
+
+
+
 

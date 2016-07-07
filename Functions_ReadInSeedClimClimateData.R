@@ -128,6 +128,7 @@ ReadData <- function(textfile, site){
     warning(paste(textfile, "format not recognised")) # warning if logger not recognized
     dat <- NULL
   }
+  dat$file <- basename(textfile) # puts file in extra column
   dat
 }
 
@@ -244,5 +245,6 @@ plot_climate <- function(data = temperature, SITE, start_date = "2000.1.1", end_
     ggplot(aes(x = date, y = value, colour = logger)) + 
     geom_line() +
     scale_x_datetime(date_breaks = breaks) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0))
+    theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0)) +
+    ggtitle(label = SITE)
 }

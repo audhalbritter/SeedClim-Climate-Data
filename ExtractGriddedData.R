@@ -3,11 +3,16 @@
 ###############################################
 
 #### Libraries ####
-library(raster); library(ncdf4); library(lubridate); library(plyr); library(reshape2); library(ggplot2)
+library("raster")
+library("ncdf4")
+library("lubridate")
+library("plyr")
+library("reshape2")
+library("ggplot2")
+
 
 #### Load SeedClim coordinates ####
-setwd("~/Dropbox/Bergen/SeedClim Climate")
-sites <- read.csv("sites.csv",header=T, sep=";")
+sites <- read.csv("~/Dropbox/Bergen/SeedClim Climate/sites.csv",header=T, sep=";")
 head(sites)
 site.names <- sites$siteID
 coords <- cbind(sites$x_UTM33_North, sites$y_UTM33_north)
@@ -18,8 +23,8 @@ setwd("/Volumes/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClim/m
 
 # make a list with all file names
 #files <- c("seNorge2_TEMP1h_grid_201001.nc", "seNorge2_TEMP1h_grid_201002.nc") # first two files to check the code
-#files <- list.files(path="/Volumes/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClim/met-data/AirTempData", pattern='\\.nc$', full.names = TRUE)
-files <- list.files(path="P:/Ecological and Environmental Change/SeedClim/met-data/AirTempData", pattern='\\.nc$', full.names = TRUE)
+files <- list.files(path="/Volumes/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClim/met-data/AirTempData", pattern='\\.nc$', full.names = TRUE)
+#files <- list.files(path="P:/Ecological and Environmental Change/SeedClim/met-data/AirTempData", pattern='\\.nc$', full.names = TRUE)
 
 
 #### Function to read in data ####
