@@ -231,3 +231,18 @@ ImportMetadata <- function(site){
   all.ITAS <- do.call(rbind, c(dat.ITAS, dat.UTL))
   all.ITAS
 }
+
+
+#### PLOTS ####
+
+# Function to the climate data and zoom in on different time steps. Data is temperature by default. log will include a list of loggers if inc = TRUE. If inc = FALSE it will take the opposite of the logger list.
+plot_climate <- function(data = temperature, SITE, start_date = "2000.1.1", end_date = "2100.1.1", log, inc = TRUE, breaks = "month"){
+  data %>% 
+    filter(date > as.POSIXct(ymd(start_date)), date < as.POSIXct(ymd(end_date))) %>%
+    filter(site == SITE) %>% 
+    filter ((logger %in% log) == inc) %>% 
+    ggplot(aes(x = date, y = value, colour = logger)) + 
+    geom_line() +
+    scale_x_datetime(date_breaks = breaks) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0))
+}
