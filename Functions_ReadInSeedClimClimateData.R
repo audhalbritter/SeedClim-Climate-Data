@@ -11,6 +11,7 @@ library("lubridate")
 library("reshape2")
 library("tidyr")
 library("dplyr")
+library("ggplot2")
 
 #### IMPORT DATA ####
 
