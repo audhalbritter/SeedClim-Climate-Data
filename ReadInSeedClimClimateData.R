@@ -92,7 +92,7 @@ temperature$logger[temperature$file == "Veskre_ITAS_140802_141003.txt" & tempera
 temperature$logger[temperature$file == "Veskre_ITAS_140802_141003.txt" & temperature$logger == "temp2"] <- "tempabove"
 # Flag temp1 in 2015, because measuring both soil temp
 temperature$flag[temperature$file == "Veskre_climate 11102015 - 08122015.txt" & temperature$logger == "temp1"] <- "VarianceProblem"
-temperature$falg[temperature$file == "Veskre_climate 20150909 - 20151011.txt" & temperature$logger == "temp1"] <- "VarianceProblem"
+temperature$flag[temperature$file == "Veskre_climate 20150909 - 20151011.txt" & temperature$logger == "temp1"] <- "VarianceProblem"
 
 # RAMBAERA
 # switch temp1 and temp2 before 2014
@@ -147,11 +147,3 @@ temperature$flag[temperature$site == "Gud" & year(temperature$date) == "2012" & 
 # Change remaining logger names
 temperature$logger[temperature$logger == "temp1"] <- "tempabove"
 temperature$logger[temperature$logger == "temp2"] <- "tempsoil"
-
-
-plot_climate(start_date = "2008.1.1", end_date = "2017.1.1", log = c("temp1", "temp2"), inc = TRUE, SITE = "Lav")
-plot_climate(start_date = "2008.1.1", end_date = "2017.1.1", log = c("tempabove", "tempsoil"), inc = TRUE, SITE = "Skj")
-temperature %>%
-  filter(site == "Lav", logger == "temp1", year(date) <= "2012") %>%
-  group_by(file) %>%
-  summarise(n = n(), MIN = min(date), max = max(date))
