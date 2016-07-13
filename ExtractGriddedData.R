@@ -12,19 +12,18 @@ library("ggplot2")
 
 
 #### Load SeedClim coordinates ####
-sites <- read.csv("~/Dropbox/Bergen/SeedClim Climate/sites.csv",header=T, sep=";")
+sites <- read.csv("W:/Dropbox/Bergen/SeedClim Climate/sites.csv",header=T, sep=";")
 head(sites)
 site.names <- sites$siteID
 coords <- cbind(sites$x_UTM33_North, sites$y_UTM33_north)
 
 #### Climate data on P ####
 setwd("P:/Ecological and Environmental Change/SeedClim/met-data/AirTempData") # all data
-setwd("/Volumes/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClim/met-data/AirTempData")
+#setwd("/Volumes/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClim/met-data/AirTempData")
 
 # make a list with all file names
-#files <- c("seNorge2_TEMP1h_grid_201001.nc", "seNorge2_TEMP1h_grid_201002.nc") # first two files to check the code
-files <- list.files(path="/Volumes/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClim/met-data/AirTempData", pattern='\\.nc$', full.names = TRUE)
-#files <- list.files(path="P:/Ecological and Environmental Change/SeedClim/met-data/AirTempData", pattern='\\.nc$', full.names = TRUE)
+#files <- list.files(path="/Volumes/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClim/met-data/AirTempData", pattern='\\.nc$', full.names = TRUE)
+files <- list.files(path="P:/Ecological and Environmental Change/SeedClim/met-data/AirTempData", pattern='\\.nc$', full.names = TRUE)
 
 
 #### Function to read in data ####
@@ -73,8 +72,10 @@ monthly <- aggregate(value ~ my+variable, D, mean)
 monthly$my <- paste(15, monthly$my, sep="") # add a day
 monthly$date <- dmy(monthly$my) # back to date format
 monthly.temp <- monthly[order(monthly$variable, monthly$date),]
-monthly.temp <- monthly.temp[,c(4,2,3)]
-colnames(monthly.temp) <- c("date", "site", "temperature")
+monthly.temp$logger <- "gridded"
+monthly.temp <- monthly.temp[,c(4,5,3,2)]
+colnames(monthly.temp) <- c("date", "logger", "value", "site")
+monthly.temp$site <- substring(monthly.temp$site, 1,3)
 save(monthly.temp, file = "Monthly.Temp_GriddedData_2010-2015.RData")
 
 
@@ -83,31 +84,8 @@ D$dmy <- format(D$date, "%d%m%y") # reformat day, month and year
 daily <- aggregate(value ~ dmy+variable, D, mean)
 daily$date <- dmy(daily$dmy)
 daily.temp <- daily[order(daily$variable, daily$date),]
-daily.temp <- daily.temp[,c(4,2,3)]
-colnames(daily.temp) <- c("date", "site", "temperature")
+daily.temp$logger <- "gridded"
+daily.temp <- daily.temp[,c(4,5,3,2)]
+colnames(daily.temp) <- c("date", "logger", "value", "site")
+daily.temp$site <- substring(daily.temp$site, 1,3)
 save(daily.temp, file = "Daily.Temp_GriddedData_2010-2015.RData")
-
-
-
-
-
-
-# to test things
-b.obj <- brick(files[1])
-proj4string(b.obj) <- CRS("+proj=utm +zone=33 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
-b.obj2 <- crop(b.obj,e) # crop the raster object to the seedclim area
-h.airtemp <- extract(b.obj2, coords)
-h.airtemp2 <- data.frame(t(h.airtemp))
-colnames(h.airtemp2) <- site.names
-date.time <- ymd_hms(substring(names(b.obj), 2, length(names(b.obj))))
-h.airtemp2$date <- (date.time)
-head(h.airtemp2)
-
-
-# open a nc file
-x <- nc_open(files[1])
-x2<-ncvar_get(x, start = c(1,1,1), count = c(-1, -1, 1))
-long <- ncvar_get(x,"X")
-lat <- ncvar_get(x,"Y")
-time <- ncvar_get(x,"time")
-time <- as.POSIXct(time * 3600, origin = ymd_hms("1900-01-01 00:00:00")) # multiply by 3600 because time is in seconds
