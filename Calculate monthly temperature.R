@@ -1,62 +1,86 @@
 # MONTHLY AND DAILY TEMPERATURE
 
+library("lubridate")
 library("tidyr")
 library("dplyr")
 library("ggplot2")
 
+
 #### Calculate monthly means ####
-threshold <- 30 * 24 * 6 / 4 #~ one week. Minimum accepted
+threshold <- 7 * 24 #~ one week. Minimum accepted
 
-mtemp <- temperature %>%
+monthlyTemperature <- temperature %>%
   filter(!is.na(value)) %>%
-  mutate(month = dmy(paste0("15-",format(date, "%b.%Y")))) %>%
-  group_by(site, month, logger) %>%
-  summarise(mean = mean(value), sum = sum(value)) %>%
+  mutate(date = dmy(paste0("15-",format(date, "%b.%Y")))) %>%
+  group_by(date, logger, site) %>%
+  summarise(n = n(), value = mean(value), sum = sum(value)) %>%
   #filter(n > threshold) %>%
-  #select(-mean, -sum)
+  select(-n, -sum)
+
+head(monthlyTemperature)
+save(monthlyTemperature, file = "Monthly.Temperature_2008-2016.RData")
 
 
-monthlyClimate <- mklima %>%
-  select(-n, -month) %>%  
-  spread(key = variable, value = value)  
 
 
-save(klima, file = "climate.Rdata")
-save(monthlyClimate, mklima, file = "monthlyclimate.Rdata")
+# Rbind gridded and Seedclim data
+monthly <- rbind(monthly.temp, monthlyTemperature)
+monthly$site <- factor(monthly$site, levels=c("Skj", "Gud", "Lav", "Ulv", "Ves", "Ram", "Hog", "Alr", "Ovs", "Arh", "Vik", "Fau"))
 
 
-#### Calculate monthly means per site and save ####
-temperature$my <- format(temperature$date, "%m%y") # reformat month and year
-monthly <- aggregate(value ~ my+logger+site, temperature, mean)
-monthly$my <- paste(15, monthly$my, sep="") # add a day
-monthly$date <- dmy(monthly$my) # back to date format
-monthly.temperature <- monthly[order(monthly$logger, monthly$site, monthly$date),]
-monthly.temperature <- monthly.temperature[,c(5,2,3,4)]
-save(monthly.temperature, file = "Monthly.Temperature_2008-2016.RData")
+monthly %>%
+  filter(site == "Gud", logger %in% c("temp200cm", "gridded")) %>%
+  ggplot() + geom_line(aes(x = date, y = value, group = logger, color = logger))
+  
+
+monthly %>%
+  filter(logger %in% c("temp200cm", "gridded")) %>%
+  filter(value < 40) %>% # should be able to take this out with the threshold thing above!!!
+  ggplot(aes(x = date, y = value, color = logger, size = logger)) +
+    geom_line() +
+    scale_color_manual(values = c("darkgray", "lightblue")) +
+    scale_size_manual(values = c(3,1)) +
+    #scale_colour_brewer(type = "qual", palette="Paired") +
+    facet_wrap(~site) +
+    xlab("") + ylab("Monthly temperature in °C")
+
+monthly %>%
+  filter(logger %in% c("temp200cm", "temp30cm", "tempsoil", "tempabove")) %>%
+  filter(value < 40) %>%
+  ggplot(aes(x = date, y = value, color = logger)) +
+  geom_line() +
+  #scale_color_manual(values = c("blue", "lightblue")) +
+  facet_wrap(~site) +
+  xlab("") + ylab("Monthly temperature in °C")
 
 
-#### Calculate daily means per site and save ####
-temperature$dmy <- format(temperature$date, "%d%m%y") # reformat day, month and year
-daily <- aggregate(value ~ dmy+logger, temperature, mean)
-daily$date <- dmy(daily$dmy)
-daily.temperature <- daily[order(daily$logger, daily$date),]
-daily.temperature <- daily.temperature[,c(4,2,3)]
-colnames(daily.temperature) <- c("date", "site", "value")
-save(daily.temperature, file = "Daily.Temperature_2008-2016.RData")
 
-# gridded data
-monthly.temp$value <- monthly.temp$temperature
-monthly.temp$logger <- "gridded"
-monthly.temp$site <- substring(monthly.temp$site, 1,3)
-monthly.temp <- monthly.temp[,c(1,5,2,4)]
-monthly <- rbind(monthly.temp, monthly.temperature)
 
-monthly %>% 
-    filter(site == "Alr", logger == "temp200cm", logger == "gridded") %>%
-    ggplot() + geom_line(aes(x = date, y = value, group = logger))
+#### Calculate daily means ####
+dailyTemperature <- temperature %>%
+  filter(!is.na(value)) %>%
+  mutate(date = dmy(format(date, "%d.%b.%Y"))) %>%
+  group_by(date, logger, site) %>%
+  summarise(n = n(), value = mean(value), sum = sum(value)) %>%
+  #filter(n > threshold) %>%
+  select(-n, -sum)
 
-ggplot() + 
-  geom_line(data = mt, aes(x = date, y = temperature), color = "gray") +
-  geom_line(data = mt, aes(x = date, y = value)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0)) +
-  ggtitle(label = "Alr")
+save(dailyTemperature, file = "Daily.Temperature_2008-2016.RData")
+
+
+# Rbind gridded and Seedclim data
+daily <- rbind(daily.temp, dailyTemperature)
+daily$site <- factor(daily$site, levels=c("Skj", "Gud", "Lav", "Ulv", "Ves", "Ram", "Hog", "Alr", "Ovs", "Arh", "Vik", "Fau"))
+
+daily %>%
+  filter(logger %in% c("tempsoil", "gridded")) %>%
+  #filter(value < 40) %>% # should be able to take this out with the threshold thing above!!!
+  ggplot(aes(x = date, y = value, color = logger, size = logger)) +
+  geom_line() +
+  scale_color_manual(values = c("darkgray", "lightblue")) +
+  scale_size_manual(values = c(3,1)) +
+  #scale_colour_brewer(type = "qual", palette="Paired") +
+  facet_wrap(~site) +
+  xlab("") + ylab("Daily temperature in °C")
+
+plot_gridded_temp(data = daily, start_date = "2014.1.1", end_date = "2015.12.31", SITE = c("Skj", "Gud", "Lav", "Ves", "Ram", "Hog"), log = c("tempabove", "gridded"), inc = TRUE, breaks = "month")

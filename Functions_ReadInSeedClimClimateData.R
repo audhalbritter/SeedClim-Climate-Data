@@ -249,3 +249,22 @@ plot_climate <- function(data = temperature, SITE, start_date = "2000.1.1", end_
     theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0)) +
     ggtitle(label = SITE)
 }
+
+
+
+# Function to plot climate and gridded data. log will include a list of loggers if inc = TRUE. If inc = FALSE it will take the opposite of the logger list.
+plot_gridded_temp <- function(data, start_date = "2000.1.1", end_date = "2100.1.1", SITE, log, inc = TRUE, breaks = "month"){
+  data %>% 
+    filter(date > as.POSIXct(ymd(start_date)), date < as.POSIXct(ymd(end_date))) %>%
+    filter ((logger %in% log) == inc) %>%
+    filter (site %in% SITE) %>% 
+    filter(value < 40) %>%
+    ggplot(aes(x = date, y = value, colour = logger, size = logger)) + 
+    geom_line() +
+    scale_color_manual(values = c("darkgray", "lightblue")) +
+    scale_size_manual(values = c(3,1)) +
+    scale_x_datetime(date_breaks = breaks) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0)) +
+    facet_wrap(~site) +
+    xlab("") + ylab("Temperature in °C")
+}
