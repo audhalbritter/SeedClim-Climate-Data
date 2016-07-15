@@ -20,8 +20,17 @@ monthlyTemperature <- temperature %>%
 head(monthlyTemperature)
 save(monthlyTemperature, file = "Monthly.Temperature_2008-2016.RData")
 
-
-
+#fill missing months with NA y merging with complete dataset
+filler <- expand.grid(
+  site = unique(monthlyTemperature$site),
+  logger = unique(monthlyTemperature$logger),
+  date = seq(
+    min(monthlyTemperature$date),
+    max(monthlyTemperature$date),
+    by = "month"
+  )
+)
+monthlyTemperature <- merge(monthlyTemperature, filler, all = TRUE)
 
 # Rbind gridded and Seedclim data
 monthly <- rbind(monthly.temp, monthlyTemperature)
