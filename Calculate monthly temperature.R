@@ -40,11 +40,11 @@ monthly$site <- factor(monthly$site, levels=c("Skj", "Gud", "Lav", "Ulv", "Ves",
 monthly %>%
   filter(site == "Gud", logger %in% c("temp200cm", "gridded")) %>%
   ggplot() + geom_line(aes(x = date, y = value, group = logger, color = logger))
-  
+
 
 monthly %>%
   filter(logger %in% c("temp200cm", "gridded")) %>%
-  filter(value < 40) %>% # should be able to take this out with the threshold thing above!!!
+  #filter(value < 40) %>% # should be able to take this out with the threshold thing above!!!
   ggplot(aes(x = date, y = value, color = logger, size = logger)) +
     geom_line() +
     scale_color_manual(values = c("darkgray", "lightblue")) +
