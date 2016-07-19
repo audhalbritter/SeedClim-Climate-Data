@@ -6,7 +6,6 @@
 ### LIBRARIES
 library("plyr")
 library("stringi")
-library("plyr")
 library("lubridate")
 library("reshape2")
 library("tidyr")
