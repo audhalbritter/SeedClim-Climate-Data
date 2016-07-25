@@ -19,11 +19,12 @@ table(temperature$logger, year(temperature$date))
 table(temperature$site, year(temperature$date))
 
 # plot logger by site
-plot_climate(start_date = "2008.1.1", end_date = "2017.1.1", log = c("temp1", "temp2"), inc = TRUE, SITE = "Vik")
+plot_climate(start_date = "2008.1.1", end_date = "2017.1.1", log = c("temp30cm"), inc = TRUE, SITE = "Skj")
+
 
 # Find file names
 temperature %>%
-  filter(site == "Hog", logger == "") %>%
+  filter(site == "Skj", logger == "") %>%
   group_by(file) %>%
   summarise(n = n(), MIN = min(date), max = max(date))
   

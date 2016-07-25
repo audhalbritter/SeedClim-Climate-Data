@@ -17,7 +17,6 @@ monthlyTemperature <- temperature %>%
   #filter(n > threshold) %>%
   select(-n, -sum)
 
-head(monthlyTemperature)
 save(monthlyTemperature, file = "Monthly.Temperature_2008-2016.RData")
 
 #fill missing months with NA y merging with complete dataset
@@ -38,12 +37,12 @@ monthly$site <- factor(monthly$site, levels=c("Skj", "Gud", "Lav", "Ulv", "Ves",
 
 
 monthly %>%
-  filter(site == "Gud", logger %in% c("temp200cm", "gridded")) %>%
+  filter(site == "Skj", logger %in% c("temp30cm", "gridded")) %>%
   ggplot() + geom_line(aes(x = date, y = value, group = logger, color = logger))
 
 
 monthly %>%
-  filter(logger %in% c("temp200cm", "gridded")) %>%
+  filter(logger %in% c("temp30cm", "gridded")) %>%
   #filter(value < 40) %>% # should be able to take this out with the threshold thing above!!!
   ggplot(aes(x = date, y = value, color = logger, size = logger)) +
     geom_line() +
@@ -77,12 +76,25 @@ dailyTemperature <- temperature %>%
 save(dailyTemperature, file = "Daily.Temperature_2008-2016.RData")
 
 
+#fill missing months with NA y merging with complete dataset
+filler <- expand.grid(
+  site = unique(dailyTemperature$site),
+  logger = unique(dailyTemperature$logger),
+  date = seq(
+    min(dailyTemperature$date),
+    max(dailyTemperature$date),
+    by = "day"
+  )
+)
+dailyTemperature <- merge(dailyTemperature, filler, all = TRUE)
+
+
 # Rbind gridded and Seedclim data
 daily <- rbind(daily.temp, dailyTemperature)
 daily$site <- factor(daily$site, levels=c("Skj", "Gud", "Lav", "Ulv", "Ves", "Ram", "Hog", "Alr", "Ovs", "Arh", "Vik", "Fau"))
 
 daily %>%
-  filter(logger %in% c("tempsoil", "gridded")) %>%
+  filter(logger %in% c("temp30cm", "gridded")) %>%
   #filter(value < 40) %>% # should be able to take this out with the threshold thing above!!!
   ggplot(aes(x = date, y = value, color = logger, size = logger)) +
   geom_line() +
@@ -93,3 +105,12 @@ daily %>%
   xlab("") + ylab("Daily temperature in °C")
 
 plot_gridded_temp(data = daily, start_date = "2014.1.1", end_date = "2015.12.31", SITE = c("Skj", "Gud", "Lav", "Ves", "Ram", "Hog"), log = c("tempabove", "gridded"), inc = TRUE, breaks = "month")
+
+temperature %>% 
+  filter(date > as.POSIXct(ymd("2013.09.23")), date < as.POSIXct(ymd("2016.10.05"))) %>%
+  filter(site %in% c("Skj")) %>% 
+  filter (logger == "temp30cm") %>% 
+  ggplot(aes(x = date, y = value)) + 
+  geom_line() +
+  facet_wrap(~site)
+

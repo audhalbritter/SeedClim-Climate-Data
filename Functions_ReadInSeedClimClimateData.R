@@ -4,7 +4,6 @@
 ####################################
 
 ### LIBRARIES
-library("plyr")
 library("stringi")
 library("lubridate")
 library("reshape2")
