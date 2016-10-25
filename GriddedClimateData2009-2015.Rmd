@@ -1,0 +1,118 @@
+---
+title: "GriddedClimateData2009-2015"
+author: "Aud Halbritter"
+date: "25.10.2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache = TRUE)
+```
+
+```{r loadStuff, echo = FALSE}
+#Load libraries
+library("ggplot2")
+library("dplyr")
+library("tidyr")
+
+#load data
+load("GriddedDailyClimateData2009-2015.Rdata")
+```
+
+## Overview
+
+Gridded data from met.no (from Ole Einar Tveito, 25.10.2016)
+Climate data are for 12 the SeedClim / FunCaB sites from the period of 2009 - 2016, daily values
+
+Climate variables are
+ - Mean daily temperature (°C, Temperature)
+ - Relative air moisture (??, RelAirMoisture)
+ - Mean wind (??, Wind)
+ - Mean cloud cover (??, CloudCover)
+ - Precipitation (mm, Precipitation)
+
+Will provide monthly and annual mean data for each site soon.
+
+
+## Data processing
+
+The data was provided in dat files.
+
+The raw data is stored on P:/Ecological and Environmental Change/SeedClim/met-data/GriddedClimateData2009-2015
+
+Code for reading the data from the dat files is in files 'ReadInGriddedData2009-2015.R'. These are archived versions of the code; the working version of the code in the SeedClim-Climate-Data github repository.
+
+Site names were changed from a ID that was used to extranct the data to the 3 letter site names used in SeedClim (Gud, Lav, Vik,...).
+
+
+## Importing the data
+
+The data are provided in .Rdata files. These can be read into R with the `load` command, and ensures that dates etc are correct. The data are in a tidy format: one row - one observation. This code will load the data and packages needed to plot them.
+
+```{r loadStuff, eval = FALSE} 
+```
+
+
+## Plotting the data
+
+Temperature
+
+```{r}
+ggplot(climate0915, aes(x = Date, y = Temperature, color = Site)) +
+  geom_line() +
+  scale_colour_brewer(palette="Paired") +
+  facet_wrap(~ Site) + 
+  theme(legend.position="none") +
+  ggtitle("Temperature")
+```
+
+
+
+RelAirMoisture
+
+```{r}
+ggplot(climate0915, aes(x = Date, y = RelAirMoisture, color = Site)) +
+  geom_line() +
+  scale_colour_brewer(palette="Paired") +
+  facet_wrap(~ Site) + 
+  theme(legend.position="none") +
+  ggtitle("Relative Air Moisture")
+```
+
+
+Wind
+```{r}
+ggplot(climate0915, aes(x = Date, y = Wind, color = Site)) +
+  geom_line() +
+  scale_colour_brewer(palette="Paired") +
+  facet_wrap(~ Site) + 
+  theme(legend.position="none") +
+  ggtitle("Wind")
+
+```
+
+
+CloudCover
+```{r}
+ggplot(climate0915, aes(x = Date, y = CloudCover, color = Site)) +
+  geom_line() +
+  scale_colour_brewer(palette="Paired") +
+  facet_wrap(~ Site) + 
+  theme(legend.position="none") +
+  ggtitle("Cloud Cover")
+```
+
+
+Precipitation
+```{r}
+ggplot(climate0915, aes(x = Date, y = Precipitation, color = Site)) +
+  geom_line() +
+  scale_colour_brewer(palette="Paired") +
+  facet_wrap(~ Site) + 
+  theme(legend.position="none") +
+  ggtitle("Precipitation")
+
+```
+
+
+
