@@ -5,6 +5,8 @@ library("tidyr")
 library("dplyr")
 library("ggplot2")
 
+save(temperature, file = "Temperature.RData")
+load("Temperature.RData", verbose = TRUE)
 
 #### Calculate monthly means ####
 threshold <- 7 * 24 #~ one week. Minimum accepted
@@ -94,7 +96,7 @@ daily <- rbind(daily.temp, dailyTemperature)
 daily$site <- factor(daily$site, levels=c("Skj", "Gud", "Lav", "Ulv", "Ves", "Ram", "Hog", "Alr", "Ovs", "Arh", "Vik", "Fau"))
 
 daily %>%
-  filter(logger %in% c("temp30cm", "gridded")) %>%
+  filter(logger %in% c("temp200cm", "gridded")) %>%
   #filter(value < 40) %>% # should be able to take this out with the threshold thing above!!!
   ggplot(aes(x = date, y = value, color = logger, size = logger)) +
   geom_line() +
@@ -109,8 +111,14 @@ plot_gridded_temp(data = daily, start_date = "2014.1.1", end_date = "2015.12.31"
 temperature %>% 
   filter(date > as.POSIXct(ymd("2013.09.23")), date < as.POSIXct(ymd("2016.10.05"))) %>%
   filter(site %in% c("Skj")) %>% 
-  filter (logger == "temp30cm") %>% 
+  filter (logger == "temp200cm") %>% 
   ggplot(aes(x = date, y = value)) + 
   geom_line() +
   facet_wrap(~site)
+
+# Calculate mean annual temp
+dailyTemperature %>% 
+  filter(logger == "temp200cm") %>% 
+  group_by(site, year(date)) %>% 
+  summarise(mean = mean(value))
 
