@@ -41,7 +41,11 @@ climate0915 <- gridclimate %>%
   mutate(Site = factor(Site, levels = c("Ulv", "Lav", "Gud", "Skj", "Alr", "Hog", "Ram", "Ves", "Fau", "Vik", "Arh", "Ovs"))) %>% 
   mutate(Temperature = as.numeric(Temperature), RelAirMoisture = as.numeric(RelAirMoisture), Wind = as.numeric(Wind), CloudCover = as.numeric(CloudCover), Precipitation = as.numeric(Precipitation))
 
+setwd("~/Dropbox/Bergen/SeedClim Climate/SeedClim-Climate-Data")
+save(climate0915, file = "GriddedDailyClimateData2009-2015.RData")
 
+
+# Making Figures
 # Temperature
 ggplot(climate0915, aes(x = Date, y = Temperature, color = Site)) +
   geom_line() +
