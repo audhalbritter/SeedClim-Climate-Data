@@ -22,16 +22,18 @@ load("GriddedDailyClimateData2009-2015.Rdata")
 ## Overview
 
 Gridded data from met.no (from Ole Einar Tveito, 25.10.2016)
-Climate data are for 12 the SeedClim / FunCaB sites from the period of 2009 - 2016, daily values
+Climate data are for 12 the SeedClim / FunCaB sites from the period of 2009 - 2015, daily values
 
 Climate variables are
  - Mean daily temperature (°C, Temperature)
  - Relative air moisture (??, RelAirMoisture)
  - Mean wind (??, Wind)
- - Mean cloud cover (??, CloudCover)
+ - Mean cloud cover (in 8 parts, CloudCover)
  - Precipitation (mm, Precipitation)
 
-Will provide monthly and annual mean data for each site soon.
+Monthly and annual mean data for each site is available:
+GriddedMonthlyClimateData2009-2015.RData
+GriddedAnnualClimateData2009-2015.RData
 
 
 ## Data processing
@@ -42,12 +44,13 @@ The raw data is stored on P:/Ecological and Environmental Change/SeedClim/met-da
 
 Code for reading the data from the dat files is in files 'ReadInGriddedData2009-2015.R'. These are archived versions of the code; the working version of the code in the SeedClim-Climate-Data github repository.
 
-Site names were changed from a ID that was used to extranct the data to the 3 letter site names used in SeedClim (Gud, Lav, Vik,...).
+Site names were changed from a ID that was used to extranct the data to the 3 letter site names used in SeedClim (Gud, Lav, Vik,...). The Code for the ID's can be found on P drive.
 
 
 ## Importing the data
 
 The data are provided in .Rdata files. These can be read into R with the `load` command, and ensures that dates etc are correct. The data are in a tidy format: one row - one observation. This code will load the data and packages needed to plot them.
+E.g.: load("GriddedAnnualClimateData2009-2015.RData", verbose=TRUE)
 
 ```{r loadStuff, eval = FALSE} 
 ```
