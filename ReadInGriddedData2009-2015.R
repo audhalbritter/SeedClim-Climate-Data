@@ -43,14 +43,23 @@ save(climate0915, file = "GriddedDailyClimateData2009-2015.RData")
 
 
 # Calculate Monthly Mean
-monthlyTemperature <- climate0915 %>%
+monthlyClimate <- climate0915 %>%
   select(-Year, -Month, -Day) %>% 
   gather(key = Logger, value = value, -Site, -Date) %>% 
   mutate(dateMonth = dmy(paste0("15-",format(Date, "%b.%Y")))) %>%
   group_by(dateMonth, Logger, Site) %>%
   summarise(n = n(), value = mean(value))
 
-save(monthlyTemperature, file = "GriddedMonthlyClimateData2009-2015.RData")
+save(monthlyClimate, file = "GriddedMonthlyClimateData2009-2015.RData")
+
+# Calculate Annual Means
+annualClimate <- monthlyClimate %>% 
+  mutate(dateYear = year(dateMonth)) %>%
+  group_by(dateYear, Logger, Site) %>%
+  summarise(annualMean = mean(value)) %>% 
+  spread(key = Logger, value = annualMean)
+  
+save(annualClimate, file = "GriddedAnnualClimateData2009-2015.RData")
 
 # Making Figures
 # Temperature
