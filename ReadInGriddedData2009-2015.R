@@ -24,12 +24,8 @@ ReadInFiles <- function(textfile){
   return(dd)
 }
 
-
-setwd("~/Dropbox/Bergen/SeedClim Climate/SeedClim-Climate-Data/GriddedClimateData2009-2015")
-
-
-"P:/Ecological and Environmental Change/SeedClim/met-data/..."
-myfiles <- list.files(path="~/Dropbox/Bergen/SeedClim Climate/SeedClim-Climate-Data/GriddedClimateData2009-2015", pattern='\\.dat$', full.names = TRUE)
+# Connect to data on P drive
+myfiles <- list.files(path="/Volumes/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClimClimateData/met-data/GriddedClimateData2009-2015", pattern='\\.dat$', full.names = TRUE)
 
 # make a list of textfiles
 gridclimate <- plyr::ldply(myfiles, ReadInFiles)
@@ -41,9 +37,20 @@ climate0915 <- gridclimate %>%
   mutate(Site = factor(Site, levels = c("Ulv", "Lav", "Gud", "Skj", "Alr", "Hog", "Ram", "Ves", "Fau", "Vik", "Arh", "Ovs"))) %>% 
   mutate(Temperature = as.numeric(Temperature), RelAirMoisture = as.numeric(RelAirMoisture), Wind = as.numeric(Wind), CloudCover = as.numeric(CloudCover), Precipitation = as.numeric(Precipitation))
 
+# Change directory
 setwd("~/Dropbox/Bergen/SeedClim Climate/SeedClim-Climate-Data")
 save(climate0915, file = "GriddedDailyClimateData2009-2015.RData")
 
+
+# Calculate Monthly Mean
+monthlyTemperature <- climate0915 %>%
+  select(-Year, -Month, -Day) %>% 
+  gather(key = Logger, value = value, -Site, -Date) %>% 
+  mutate(dateMonth = dmy(paste0("15-",format(Date, "%b.%Y")))) %>%
+  group_by(dateMonth, Logger, Site) %>%
+  summarise(n = n(), value = mean(value))
+
+save(monthlyTemperature, file = "GriddedMonthlyClimateData2009-2015.RData")
 
 # Making Figures
 # Temperature
