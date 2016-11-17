@@ -26,9 +26,9 @@ Climate data are for 12 the SeedClim / FunCaB sites from the period of 2009 - 20
 
 Climate variables are  
  - Mean daily temperature (°C, Temperature)  
- - Relative air moisture (??, RelAirMoisture)  
- - Mean wind (??, Wind)  
- - Mean cloud cover (in 8 parts, CloudCover)  
+ - Relative air moisture (%, RelAirMoisture)  
+ - Mean wind (meter / second, Wind)  
+ - Mean cloud cover (in 8 parts, no dimension, CloudCover)  
  - Precipitation (mm, Precipitation)
 
 Monthly and annual mean data for each site is available:
