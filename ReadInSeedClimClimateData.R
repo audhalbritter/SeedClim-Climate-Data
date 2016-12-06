@@ -13,6 +13,13 @@ temperature <- subset(climate, logger %in% c("temp1", "temp2", "temp200cm", "tem
 precipitation <- subset(climate, logger %in% c("nedbor", "counter"))
 soilmoisture <- subset(climate, logger %in% c("jordf1", "jordf2"))
 
+### this needs fixing!!! Wrong dates!!!
+soilmoisture <- soilmoisture %>% filter(!date < "1990-01-04 00:00:00")
+precipitation <- precipitation %>% filter(!date < "1990-01-04 00:00:00")
+save(precipitation, file = "Precipitation.RData")
+save(soilmoisture, file = "Soilmoisture.RData")
+
+
 # Explore temparure data and plot
 table(temperature$logger, temperature$site)
 table(temperature$logger, year(temperature$date))
