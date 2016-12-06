@@ -19,7 +19,7 @@ library("tidyr")
 load("GriddedDailyClimateData2009-2015.Rdata")
 ```
 
-## Overview
+##  Overview
 
 Gridded data from met.no (from Ole Einar Tveito, 25.10.2016)
 Climate data are for 12 the SeedClim / FunCaB sites from the period of 2009 - 2015, daily values
