@@ -25,32 +25,31 @@ ReadInFiles <- function(textfile){
 }
 
 # Connect to data on P drive
-myfiles <- list.files(path="/Volumes/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClimClimateData/met-data/GriddedClimateData2009-2015", pattern='\\.dat$', full.names = TRUE)
+myfiles <- list.files(path="/Volumes/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClimClimateData/met-data/GriddedClimateData2009-2016", pattern='\\.dat$', recursive = TRUE, full.names = TRUE)
 
 # make a list of textfiles
 gridclimate <- plyr::ldply(myfiles, ReadInFiles)
 head(gridclimate)
 
-climate0915 <- gridclimate %>% 
+climate <- gridclimate %>% 
   # replace site names by real names
   mutate(Site = plyr::mapvalues(Site, c("888001", "888002", "888003", "888004", "888005", "888006", "888007", "888008", "888009", "888010", "888011", "888012"), c("Alr", "Arh", "Fau", "Gud", "Hog", "Lav", "Ovs", "Ram", "Skj", "Ulv", "Ves", "Vik"))) %>% 
   mutate(Site = factor(Site, levels = c("Ulv", "Lav", "Gud", "Skj", "Alr", "Hog", "Ram", "Ves", "Fau", "Vik", "Arh", "Ovs"))) %>% 
+  mutate(Year = as.numeric(Year)) %>% 
   mutate(Temperature = as.numeric(Temperature), RelAirMoisture = as.numeric(RelAirMoisture), Wind = as.numeric(Wind), CloudCover = as.numeric(CloudCover), Precipitation = as.numeric(Precipitation))
 
 # Change directory
-setwd("~/Dropbox/Bergen/SeedClim Climate/SeedClim-Climate-Data")
-save(climate0915, file = "GriddedDailyClimateData2009-2015.RData")
+save(climate, file = "GriddedDailyClimateData2009-2016.RData")
 
 
 # Calculate Monthly Mean
-monthlyClimate <- climate0915 %>%
+monthlyClimate <- climate %>%
   select(-Year, -Month, -Day) %>% 
   gather(key = Logger, value = value, -Site, -Date) %>% 
   mutate(dateMonth = dmy(paste0("15-",format(Date, "%b.%Y")))) %>%
   group_by(dateMonth, Logger, Site) %>%
   summarise(n = n(), value = mean(value))
 
-save(monthlyClimate, file = "GriddedMonthlyClimateData2009-2015.RData")
 
 # Calculate Annual Means
 annualClimate <- monthlyClimate %>% 
@@ -59,11 +58,13 @@ annualClimate <- monthlyClimate %>%
   summarise(annualMean = mean(value)) %>% 
   spread(key = Logger, value = annualMean)
   
-save(annualClimate, file = "GriddedAnnualClimateData2009-2015.RData")
+save(monthlyClimate, annualClimate, file = paste0("GriddedMonth_AnnualClimate2009-2016", ".Rdata"))
+#load(file = "GriddedMonth_AnnualClimate2009-2016.RData", verbose = TRUE)
+
 
 # Making Figures
 # Temperature
-ggplot(climate0915, aes(x = Date, y = Temperature, color = Site)) +
+ggplot(climate, aes(x = Date, y = Temperature, color = Site)) +
   geom_line() +
   scale_colour_brewer(palette="Paired") +
   facet_wrap(~ Site) + 
@@ -72,7 +73,7 @@ ggplot(climate0915, aes(x = Date, y = Temperature, color = Site)) +
 
 
 # RelAirMoisture
-ggplot(climate0915, aes(x = Date, y = RelAirMoisture, color = Site)) +
+ggplot(climate, aes(x = Date, y = RelAirMoisture, color = Site)) +
   geom_line() +
   scale_colour_brewer(palette="Paired") +
   facet_wrap(~ Site) + 
@@ -80,7 +81,7 @@ ggplot(climate0915, aes(x = Date, y = RelAirMoisture, color = Site)) +
   ggtitle("Relative Air Moisture")
 
 # Wind
-ggplot(climate0915, aes(x = Date, y = Wind, color = Site)) +
+ggplot(climate, aes(x = Date, y = Wind, color = Site)) +
   geom_line() +
   scale_colour_brewer(palette="Paired") +
   facet_wrap(~ Site) + 
@@ -88,7 +89,7 @@ ggplot(climate0915, aes(x = Date, y = Wind, color = Site)) +
   ggtitle("Wind")
 
 # CloudCover
-ggplot(climate0915, aes(x = Date, y = CloudCover, color = Site)) +
+ggplot(climate, aes(x = Date, y = CloudCover, color = Site)) +
   geom_line() +
   scale_colour_brewer(palette="Paired") +
   facet_wrap(~ Site) + 
@@ -96,7 +97,7 @@ ggplot(climate0915, aes(x = Date, y = CloudCover, color = Site)) +
   ggtitle("Cloud Cover")
 
 # Precipitation
-ggplot(climate0915, aes(x = Date, y = Precipitation, color = Site)) +
+ggplot(climate, aes(x = Date, y = Precipitation, color = Site)) +
   geom_line() +
   scale_colour_brewer(palette="Paired") +
   facet_wrap(~ Site) + 
