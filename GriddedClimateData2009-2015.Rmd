@@ -1,7 +1,7 @@
 ---
 title: "GriddedClimateData2009-2015"
 author: "Aud Halbritter"
-date: "25.10.2016"
+date: "18.01.2017"
 output: html_document
 ---
 
@@ -16,13 +16,14 @@ library("dplyr")
 library("tidyr")
 
 #load data
-load("GriddedDailyClimateData2009-2015.Rdata")
+load("GriddedDailyClimateData2009-2016.Rdata")
 ```
 
 ##  Overview
 
-Gridded data from met.no (from Ole Einar Tveito, 25.10.2016)
-Climate data are for 12 the SeedClim / FunCaB sites from the period of 2009 - 2015, daily values
+Gridded data from met.no (from Ole Einar Tveito, 25.10.2016 and 17.01.2017)
+Climate data are for 12 the SeedClim / FunCaB sites from the period of 2009 - 2016, daily values
+
 
 Climate variables are  
  - Mean daily temperature (°C, Temperature)  
@@ -32,25 +33,25 @@ Climate variables are
  - Precipitation (mm, Precipitation)
 
 Monthly and annual mean data for each site is available:
-GriddedMonthlyClimateData2009-2015.RData
-GriddedAnnualClimateData2009-2015.RData
+GriddedMonthly_AnnualClimate2009-2016.RData
 
 
 ## Data processing
 
 The data was provided in dat files.
 
-The raw data is stored on P:/Ecological and Environmental Change/SeedClim/met-data/GriddedClimateData2009-2015
+The raw data is stored on P:/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClimClimateData/met-data/GriddedClimateData2009-2016
 
-Code for reading the data from the dat files is in files 'ReadInGriddedData2009-2015.R'. These are archived versions of the code; the working version of the code in the SeedClim-Climate-Data github repository.
+Code for reading the data from the dat files is in 'ReadInGriddedData.R'. These are archived versions of the code; the working version of the code in the SeedClim-Climate-Data github repository.
 
 Site names were changed from a ID that was used to extranct the data to the 3 letter site names used in SeedClim (Gud, Lav, Vik,...). The Code for the ID's can be found on P drive.
 
 
 ## Importing the data
 
-The data are provided in .Rdata files. These can be read into R with the `load` command, and ensures that dates etc are correct. The data are in a tidy format: one row - one observation. This code will load the data and packages needed to plot them.
-E.g.: load("GriddedAnnualClimateData2009-2015.RData", verbose=TRUE)
+The data are provided in .Rdata files. These can be read into R with the `load` command, and ensures that dates etc are correct. The data are in a tidy format: one row - one observation. This code will load the data.
+E.g.: load("GriddedDailyClimateData2009-2016.RData", verbose=TRUE)
+load("GriddedMonthly_AnnualClimate2009-2016.RData", verbose=TRUE)
 
 ```{r loadStuff, eval = FALSE} 
 ```
@@ -61,7 +62,7 @@ E.g.: load("GriddedAnnualClimateData2009-2015.RData", verbose=TRUE)
 Temperature
 
 ```{r}
-ggplot(climate0915, aes(x = Date, y = Temperature, color = Site)) +
+ggplot(climate, aes(x = Date, y = Temperature, color = Site)) +
   geom_line() +
   scale_colour_brewer(palette="Paired") +
   facet_wrap(~ Site) + 
@@ -74,7 +75,7 @@ ggplot(climate0915, aes(x = Date, y = Temperature, color = Site)) +
 RelAirMoisture
 
 ```{r}
-ggplot(climate0915, aes(x = Date, y = RelAirMoisture, color = Site)) +
+ggplot(climate, aes(x = Date, y = RelAirMoisture, color = Site)) +
   geom_line() +
   scale_colour_brewer(palette="Paired") +
   facet_wrap(~ Site) + 
@@ -85,7 +86,7 @@ ggplot(climate0915, aes(x = Date, y = RelAirMoisture, color = Site)) +
 
 Wind
 ```{r}
-ggplot(climate0915, aes(x = Date, y = Wind, color = Site)) +
+ggplot(climate, aes(x = Date, y = Wind, color = Site)) +
   geom_line() +
   scale_colour_brewer(palette="Paired") +
   facet_wrap(~ Site) + 
@@ -97,7 +98,7 @@ ggplot(climate0915, aes(x = Date, y = Wind, color = Site)) +
 
 CloudCover
 ```{r}
-ggplot(climate0915, aes(x = Date, y = CloudCover, color = Site)) +
+ggplot(climate, aes(x = Date, y = CloudCover, color = Site)) +
   geom_line() +
   scale_colour_brewer(palette="Paired") +
   facet_wrap(~ Site) + 
@@ -108,7 +109,7 @@ ggplot(climate0915, aes(x = Date, y = CloudCover, color = Site)) +
 
 Precipitation
 ```{r}
-ggplot(climate0915, aes(x = Date, y = Precipitation, color = Site)) +
+ggplot(climate, aes(x = Date, y = Precipitation, color = Site)) +
   geom_line() +
   scale_colour_brewer(palette="Paired") +
   facet_wrap(~ Site) + 
