@@ -37,7 +37,7 @@ ReadInBodyITAS <- function(textfile){
   dat <- read.table(textfile, header=TRUE, sep="\t", dec=",", comment.char = "", stringsAsFactors = FALSE)
   dat[dat == "#-INF"] <- NA # delete #-Inf
   dat[dat == "#+INF"] <- NA # delete #+Inf
-  dat <- colwise(gsub, pattern = ",", replacement = ".")(dat)#fixing number formats
+  dat <- plyr::colwise(gsub, pattern = ",", replacement = ".")(dat)#fixing number formats
   dat <- dat[-1,] # delete first row with units
   
   # some files have an extra time column (less than 15 characters)
@@ -47,7 +47,7 @@ ReadInBodyITAS <- function(textfile){
   } else { # for normal files
     date <- dat$Label
   }
-  dat[,-1] <- colwise(as.numeric)(dat[,-1]) # remove first column
+  dat[,-1] <- plyr::colwise(as.numeric)(dat[,-1]) # remove first column
   
   # convert to date
   if(stringi::stri_count(date[1], fixed = ":") == 2){
