@@ -5,7 +5,6 @@ library("tidyr")
 library("dplyr")
 library("ggplot2")
 
-save(temperature, file = "Temperature.RData")
 load("Temperature.RData", verbose = TRUE)
 
 #### Calculate monthly means ####
