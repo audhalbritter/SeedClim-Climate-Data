@@ -3,6 +3,7 @@
 ####################################
 
 #### IMPORT CLIMATE DATA FOR ALL SITES
+source('~/Dropbox/Bergen/SeedClim Climate/SeedClim-Climate-Data/Functions_ReadInSeedClimClimateData.R', echo=TRUE)
 climate <- plyr::ldply(c("Fau", "Alr", "Ulv", "Vik", "Hog", "Lav", "Arh", "Ram", "Gud", "Ovs", "Ves", "Skj"), ImportData)
 head(climate)
 unique(climate$logger)
@@ -12,7 +13,6 @@ table(climate$logger, climate$site)
 temperature <- subset(climate, logger %in% c("temp1", "temp2", "temp200cm", "temp30cm", "", "PØN", "-5cm"))
 precipitation <- subset(climate, logger %in% c("nedbor", "counter"))
 soilmoisture <- subset(climate, logger %in% c("jordf1", "jordf2", "soil.moisture", "soil.moisture.1", "soil.moisture.2"))
-
 
 save(precipitation, file = "Precipitation.RData")
 save(soilmoisture, file = "Soilmoisture.RData")
@@ -153,3 +153,5 @@ temperature$flag[temperature$site == "Gud" & year(temperature$date) == "2012" & 
 # Change remaining logger names
 temperature$logger[temperature$logger == "temp1"] <- "tempabove"
 temperature$logger[temperature$logger == "temp2"] <- "tempsoil"
+
+save(temperature, file = "Temperature.RData")
