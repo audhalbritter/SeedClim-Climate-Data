@@ -3,7 +3,7 @@
 ####################################
 
 #### IMPORT CLIMATE DATA FOR ALL SITES
-climate <- ldply(as.list(c("Fau", "Alr", "Ulv", "Vik", "Hog", "Lav", "Arh", "Ram", "Gud", "Ovs", "Ves", "Skj")), ImportData)
+climate <- plyr::ldply(c("Fau", "Alr", "Ulv", "Vik", "Hog", "Lav", "Arh", "Ram", "Gud", "Ovs", "Ves", "Skj"), ImportData)
 head(climate)
 unique(climate$logger)
 table(climate$logger, climate$site)
