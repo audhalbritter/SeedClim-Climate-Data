@@ -66,7 +66,21 @@ ReadInBodyITAS <- function(textfile){
   textfile2 <- basename(textfile)
   textfile2 <- gsub("ITAS ", "", textfile2)
   dat$site <- NameCheck(textfile2, textfile2) # check the site name
-  dat
+  
+  
+  # fixes Fauske Fall 2016 files
+  if(basename(textfile) %in% c("fauske_climate_soil_moist_prec_Fall2016.txt")){
+    message("removing temp data from fauske fall 2016 file")
+    dat <- dat %>%
+      filter(!logger %in% c("temperature", "temperature2"))
+  }
+  if(basename(textfile) %in% c("Fauske_temp_Fall2016.txt")){
+    message("removing soil moisture and precipitation data from fauske fall 2016 file")
+    dat <- dat %>%
+      filter(!logger %in% c("jordf1",	"jordf2", "nedbor"))
+  }
+  
+  return(dat)
 }
 
 
@@ -111,7 +125,7 @@ ReadInBodyUTL <- function(textfile, SITE){
   }
   dat$site <- NameCheck(dat$site[1], textfile)
   attr(dat, "type") <- "UTL" # give each file an attribute
-  dat
+  return(dat)
 }
 
 
@@ -128,7 +142,7 @@ ReadData <- function(textfile, site){
     dat <- NULL
   }
   dat$file <- basename(textfile) # puts file in extra column
-  dat
+  return(dat)
 }
 
 
@@ -138,7 +152,7 @@ ImportData <- function(site){
   myfiles <- dir(path = paste0("~/Dropbox/seedclim klimadaten/rawdata by Site/", site), pattern = "txt", recursive = TRUE, full.names = TRUE)
   
   # make a list of textfiles
-  mdat <- ldply(as.list(myfiles), ReadData, site = site)
+  mdat <- plyr::ldply(as.list(myfiles), ReadData, site = site)
   mdat
 }
 
