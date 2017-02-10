@@ -11,7 +11,7 @@ table(climate$logger, climate$site)
 # Subset soilmoisture, precipitation and temperatur loggers into seperate object
 temperature <- subset(climate, logger %in% c("temp1", "temp2", "temp200cm", "temp30cm", "", "PØN", "-5cm"))
 precipitation <- subset(climate, logger %in% c("nedbor", "counter"))
-soilmoisture <- subset(climate, logger %in% c("jordf1", "jordf2"))
+soilmoisture <- subset(climate, logger %in% c("jordf1", "jordf2", "soil.moisture", "soil.moisture.1", "soil.moisture.2"))
 
 ### this needs fixing!!! Wrong dates!!!
 soilmoisture <- soilmoisture %>% filter(!date < "1990-01-04 00:00:00")
