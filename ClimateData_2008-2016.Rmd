@@ -1,0 +1,158 @@
+---
+title: "SeedClim-FunCaBClimateData_2008-2016"
+author: "Aud Halbritter"
+date: "12 2 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache = TRUE)
+```
+
+```{r loadStuff, echo = FALSE}
+#Load libraries
+library("ggplot2")
+library("dplyr")
+library("tidyr")
+
+#load data
+load("Temperature.Rdata")
+load("Daily.Temperature_2008-2016.Rdata")
+load("Monthly.Temperature_2008-2016.Rdata")
+load("Precipitation.Rdata")
+load("Soilmoisture.Rdata")
+```
+
+##  Overview
+
+Climate data from climate logger at 12 the SeedClim / FunCaB sites from the period of 2008 - 2016, hourly values
+
+
+Climate variables are (unit / varible name)
+ - Hourly air temperature 2m above the gorund (°C, temp200cm)  
+ - Hourly air temperature 30cm above the gorund (°C, temp30cm)  
+ - Hourly air temperature 0m above the gorund / in the vegetation (°C, tempabove)  
+ - Hourly soil temperature 5cm below the gorund (°C, tempsoil)  
+ - Hourly soilmoisture (%, soilmoisture). Always 2 loggers per site! Mean not calculated yet.
+ - Hourly precipitation (mm, precipitation)  
+
+Daily and monthly mean data for each site is available for all temperature loggers:
+Daily.Temperature_2008-2016.RData
+Monthly.Temperature_2008-2016.RData
+
+
+## Data processing
+
+The data is provided in txt files.
+
+The raw data is stored in "seedclim climatedata/rawdata by Site" dropbox folder. (will be moved to P drive)
+
+Code for reading the data from the dat files is in 'ReadInSeedClimClimateData.R'. These are archived versions of the code; the working version of the code in the SeedClim-Climate-Data github repository.
+
+Temperature data:
+Wrong and problematic data and few data points have been flaged.
+Wrong logger names have been corrected.
+Soil and aboveground temperature data have been switched if they are wrong.
+
+Wrong variance or mean of data has not been removed yet! Will be done in the near future!
+
+Precipitation and soilmoisture:
+Data have not been processed yet!
+
+
+## Importing the data
+
+The data are provided in .Rdata files. These can be read into R with the `load` command, and ensures that dates etc are correct. The data are in a tidy format: one row - one observation. This code will load the data.
+E.g.: load("Temperature.RData", verbose=TRUE)
+load("Monthly.Temperature_2008-2016.RData", verbose=TRUE)
+
+```{r loadStuff, eval = FALSE} 
+```
+
+
+## Plotting the data
+
+Air temperature 2m
+
+```{r}
+dd <- temperature %>% 
+  filter(logger == "temp200cm")
+
+g <- ggplot(dd, aes(x = date, y = value, color = site)) +
+  geom_line() +
+  scale_colour_brewer(palette="Paired") +
+  facet_wrap(~ site) + 
+  theme(legend.position="none") +
+  ggtitle("Air temperature 2m")
+
+g
+```
+
+Air temperature 30cm
+
+```{r}
+dd <- temperature %>% 
+  filter(logger == "temp30cm")
+
+g + ggtitle("Air temperature 30cm")
+```
+
+Air temperature 0cm
+
+```{r}
+dd <- temperature %>% 
+  filter(logger == "tempabove")
+
+g + ggtitle("Air temperature 0cm")
+```
+
+Soil temperature 5cm
+
+```{r}
+dd <- temperature %>% 
+  filter(logger == "tempsoil")
+
+g + ggtitle("Soil temperature")
+```
+
+
+# Daily temperature
+
+```{r}
+dd <- dailyTemperature %>% 
+  filter(logger == "temp200cm")
+
+g <- ggplot(dd, aes(x = date, y = value, color = site)) +
+  geom_line() +
+  scale_colour_brewer(palette="Paired") +
+  facet_wrap(~ site) + 
+  theme(legend.position="none") +
+  ggtitle("Daily air temperature 2m")
+
+g
+```
+
+# Monthly temperature
+
+```{r}
+
+ggplot(monthlyTemperature, aes(x = date, y = value, color = logger)) +
+  geom_line() +
+  facet_wrap(~ site) + 
+  ylim(-15, 25) +
+  ggtitle("Monthly temperature")
+
+```
+
+
+# Hourly precipitation
+
+```{r}
+ggplot(precipitation, aes(x = date, y = value, color = site)) +
+  geom_line() +
+  scale_colour_brewer(palette="Paired") +
+  facet_wrap(~ site) + 
+  theme(legend.position="none") +
+  ggtitle("Precipitation")
+```
+
