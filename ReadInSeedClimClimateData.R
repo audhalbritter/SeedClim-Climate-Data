@@ -9,6 +9,9 @@ head(climate)
 unique(climate$logger)
 table(climate$logger, climate$site)
 
+# get rid of 1900 date, all empty lines
+climate <- climate %>% filter(!date < "2000-01-01")
+
 # Subset soilmoisture, precipitation and temperatur loggers into seperate object
 temperature <- subset(climate, logger %in% c("temp1", "temp2", "temp200cm", "temp30cm", "", "PØN", "-5cm"))
 precipitation <- subset(climate, logger %in% c("nedbor", "counter"))
