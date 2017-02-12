@@ -18,7 +18,6 @@ monthlyTemperature <- temperature %>%
   #filter(n > threshold) %>%
   select(-n, -sum)
 
-save(monthlyTemperature, file = "Monthly.Temperature_2008-2016.RData")
 
 #fill missing months with NA y merging with complete dataset
 filler <- expand.grid(
@@ -31,6 +30,12 @@ filler <- expand.grid(
   )
 )
 monthlyTemperature <- merge(monthlyTemperature, filler, all = TRUE)
+
+monthlyTemperature$site <- factor(monthlyTemperature$site, levels=c("Skj", "Gud", "Lav", "Ulv", "Ves", "Ram", "Hog", "Alr", "Ovs", "Arh", "Vik", "Fau"))
+
+save(monthlyTemperature, file = "Monthly.Temperature_2008-2016.RData")
+
+
 
 # Rbind gridded and Seedclim data
 monthly <- rbind(monthly.temp, monthlyTemperature)
@@ -74,8 +79,6 @@ dailyTemperature <- temperature %>%
   #filter(n > threshold) %>%
   select(-n, -sum)
 
-save(dailyTemperature, file = "Daily.Temperature_2008-2016.RData")
-
 
 #fill missing months with NA y merging with complete dataset
 filler <- expand.grid(
@@ -88,11 +91,16 @@ filler <- expand.grid(
   )
 )
 dailyTemperature <- merge(dailyTemperature, filler, all = TRUE)
+dailyTemperature$site <- factor(dailyTemperature$site, levels=c("Skj", "Gud", "Lav", "Ulv", "Ves", "Ram", "Hog", "Alr", "Ovs", "Arh", "Vik", "Fau"))
+
+save(dailyTemperature, file = "Daily.Temperature_2008-2016.RData")
 
 
 # Rbind gridded and Seedclim data
 daily <- rbind(daily.temp, dailyTemperature)
 daily$site <- factor(daily$site, levels=c("Skj", "Gud", "Lav", "Ulv", "Ves", "Ram", "Hog", "Alr", "Ovs", "Arh", "Vik", "Fau"))
+
+
 
 daily %>%
   filter(logger %in% c("temp200cm", "gridded")) %>%

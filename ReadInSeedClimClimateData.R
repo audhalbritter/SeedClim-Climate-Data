@@ -67,7 +67,10 @@ temperature$value[temperature$file == "Fauske_ITAS_14.5.14-14.10.14.txt" & tempe
 temperature$flag[temperature$file == "fauske_climate 20150129 - 20150429.txt" & temperature$logger == "temp1"] <- "VarianceProblem"
 temperature$flag[temperature$file == "fauske_climate 20150429 - 20151009.txt" & temperature$logger == "temp1"] <- "VarianceProblem"
 temperature$flag[temperature$file == "fauske_climate_spring_2016.txt" & temperature$logger == "temp1"] <- "VarianceProblem"
-# switch logger temp1 and temp2 always
+# Summer 2016 data: both ITAS loggers show very similar variance
+temperature$flag[temperature$file == "Fauske_temp_Fall2016.txt" & temperature$logger == "temp1"] <- "VarianceProblem"
+temperature$flag[temperature$file == "Fauske_temp_Fall2016.txt" & temperature$logger == "temp2"] <- "VarianceProblem"
+# switch logger temp1 and temp2 always !!!
 temperature$logger[temperature$site == "Fau" & temperature$logger == "temp1"] <- "tempsoil"
 temperature$logger[temperature$site == "Fau" & temperature$logger == "temp2"] <- "tempabove"
 
@@ -102,6 +105,10 @@ temperature$logger[temperature$file == "Veskre_ITAS_140802_141003.txt" & tempera
 # Flag temp1 in 2015, because measuring both soil temp
 temperature$flag[temperature$file == "Veskre_climate 11102015 - 08122015.txt" & temperature$logger == "temp1"] <- "VarianceProblem"
 temperature$flag[temperature$file == "Veskre_climate 20150909 - 20151011.txt" & temperature$logger == "temp1"] <- "VarianceProblem"
+# switch temp1 and temp2 in summer 2016
+temperature$logger[temperature$file == "Veskre_klima_Fall2016.txt" & temperature$logger == "temp1"] <- "tempsoil"
+temperature$logger[temperature$file == "Veskre_klima_Fall2016.txt" & temperature$logger == "temp2"] <- "tempabove"
+
 
 # RAMBAERA
 # switch temp1 and temp2 before 2014
@@ -113,11 +120,12 @@ temperature$flag[temperature$file == "Rambera_met1 10102015 - 24052016.txt" & te
 # HOGSETE
 # flag temp1 from from Sep/Oct 2015 - May 2016 too little variance
 temperature$flag[temperature$file == "Høgsete_met1_spring_2016.txt" & temperature$logger == "temp1"] <- "VarianceProblem"
+temperature$flag[temperature$file == "Høgsete_met1_Fall2016.txt" & temperature$logger == "temp1"] <- "VarianceProblem"
 
 # ALRUST
-# switch logger always
-temperature$logger[temperature$site == "Alr" & temperature$logger == "temp1"] <- "tempsoil"
-temperature$logger[temperature$site == "Alr" & temperature$logger == "temp2"] <- "tempabove"
+# switch logger until 31.12.2015
+temperature$logger[temperature$site == "Alr" & temperature$date < "2016-01-01 00:00:00" & temperature$logger == "temp1"] <- "tempsoil"
+temperature$logger[temperature$site == "Alr" & temperature$date < "2016-01-01 00:00:00" & temperature$logger == "temp2"] <- "tempabove"
 # flag temp1 from April 2012 - Dec 2012 too little variance
 temperature$flag[temperature$site == "Alr" & temperature$logger == "tempabove" & temperature$date > "2012-04-01 00:00:00" & temperature$date < "2014-12-01 00:00:00"] <- "VarianceProblem"
 # flag temp2 in 2010 and April 2015 - May 2016 too large variance
@@ -125,9 +133,9 @@ temperature$flag[temperature$site == "Alr" & temperature$logger == "tempsoil" & 
 temperature$flag[temperature$site == "Alr" & temperature$logger == "tempsoil" & temperature$date > "2015-04-01 00:00:00" & temperature$date < "2016-06-01 00:00:00"] <- "VarianceProblem"
 
 # ULVHAUGEN
-# switch logger always
-temperature$logger[temperature$site == "Ulv" & temperature$logger == "temp1"] <- "tempsoil"
-temperature$logger[temperature$site == "Ulv" & temperature$logger == "temp2"] <- "tempabove"
+# switch logger until fall 2016 (Date needs to be adapted!!!)
+temperature$logger[temperature$site == "Ulv" & date < "2016-10-05 11:00:00:00" & temperature$logger == "temp1"] <- "tempsoil"
+temperature$logger[temperature$site == "Ulv" & date < "2016-10-05 11:00:00:00" & temperature$logger == "temp2"] <- "tempabove"
 
 # LAVISDALEN
 # switch logger until 2011 (because 2012 and 2013 data is crap, delete)
@@ -148,13 +156,34 @@ temperature$flag[temperature$file == "Gudmedalen_ITAS_140619_141013.txt" & tempe
 
 # SKJELLINGAHAUGEN
 # Flag variance problems with temp1 logger in 2014
-temperature$flag[temperature$site == "Gud" & year(temperature$date) == "2014" & temperature$logger == "temp1"] <- "VarianceProblem"
+temperature$flag[temperature$site == "Skj" & year(temperature$date) == "2014" & temperature$logger == "temp1"] <- "VarianceProblem"
 # Flag few data points for both loggers in 2012
-temperature$flag[temperature$site == "Gud" & year(temperature$date) == "2012" & temperature$logger == "temp1"] <- "FewData"
-temperature$flag[temperature$site == "Gud" & year(temperature$date) == "2012" & temperature$logger == "temp2"] <- "FewData"
+temperature$flag[temperature$site == "Skj" & year(temperature$date) == "2012" & temperature$logger == "temp1"] <- "FewData"
+temperature$flag[temperature$site == "Skj" & year(temperature$date) == "2012" & temperature$logger == "temp2"] <- "FewData"
+# switch logger from 2015 - 2016
+temperature$logger[temperature$site == "Skj" & temperature$date > "2015-01-01 00:00" & temperature$date < "2016-10-04 12:00" & temperature$logger == "temp1"] <- "tempsoil"
+temperature$logger[temperature$site == "Skj" & temperature$date > "2015-01-01 00:00" & temperature$date < "2016-10-04 12:00" & temperature$logger == "temp2"] <- "tempabove"
+
 
 # Change remaining logger names
 temperature$logger[temperature$logger == "temp1"] <- "tempabove"
 temperature$logger[temperature$logger == "temp2"] <- "tempsoil"
+
+# order sites
+temperature <- temperature %>% 
+  mutate(site = factor(site, levels = c("Fau", "Alr", "Ulv", "Vik", "Hog", "Lav", "Arh", "Ram", "Gud", "Ovs", "Ves", "Skj")))
+
+#fill missing dates with NA y merging with complete dataset
+filler <- expand.grid(
+  site = unique(temperature$site),
+  logger = unique(temperature$logger),
+  date = seq(
+    min(temperature$date),
+    max(temperature$date),
+    by = "hour"
+  )
+)
+temperature <- merge(temperature, filler, all = TRUE)
+
 
 save(temperature, file = "Temperature.RData")
