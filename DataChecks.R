@@ -31,3 +31,20 @@ g <- ggplot(dd, aes(x = date, y = value, color = site)) +
   ggtitle("Air temperature 2m")
 
 g
+
+
+
+
+daily_dat <- temperature %>% 
+  mutate(day = ymd(format(date, "%Y-%m-%d"))) %>%
+  select(-file, -flag) %>% 
+  group_by(day, site, logger) %>% 
+  summarise(mean = mean(value), min = min(value), max = max(value), diff = max - min)
+
+daily_dat %>% 
+  filter(logger == "temp200cm") %>%
+  ggplot(aes(x = day, y = mean, colour = site)) + geom_line() + facet_grid(~ site)
+
+daily_dat %>% 
+  filter(logger == "temp30cm") %>% 
+  ggplot(aes(x = day, y = diff, colour = site)) + geom_point() + facet_wrap(~site)
