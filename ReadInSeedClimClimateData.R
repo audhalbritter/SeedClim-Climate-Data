@@ -1,6 +1,7 @@
 ####################################
 # READ IN SEEDCLIM CLIMATE DATA
 ####################################
+library("tidyverse")
 
 #### IMPORT CLIMATE DATA FOR ALL SITES
 source('~/Dropbox/Bergen/SeedClim Climate/SeedClim-Climate-Data/Functions_ReadInSeedClimClimateData.R', echo=TRUE)
