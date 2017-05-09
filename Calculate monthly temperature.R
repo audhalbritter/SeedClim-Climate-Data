@@ -1,8 +1,7 @@
 # MONTHLY AND DAILY TEMPERATURE
 
 library("lubridate")
-library("tidyr")
-library("dplyr")
+library("tidyverse")
 library("ggplot2")
 
 load("Temperature.RData", verbose = TRUE)
