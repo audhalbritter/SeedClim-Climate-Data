@@ -147,6 +147,13 @@ temperature$flag[temperature$site == "Lav" & temperature$logger == "tempsoil" & 
 # Flag few and strange data points for both loggers in 2013
 temperature$flag[temperature$site == "Lav" & year(temperature$date) == "2013" & temperature$logger == "temp1"] <- "FewData"
 temperature$flag[temperature$site == "Lav" & year(temperature$date) == "2013" & temperature$logger == "temp2"] <- "FewData"
+# Flag wrong data points for both loggers in 2012
+temperature <- temperature %>% 
+  mutate(flag = ifelse(file == "Lavisdalen_met1.txt", "wrongValues", flag))
+
+
+
+
 
 # GUDMEDALEN
 # switch logger until end of 2014
