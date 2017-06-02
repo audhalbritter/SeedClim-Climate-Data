@@ -2,7 +2,7 @@
 
 library("lubridate")
 library("tidyverse")
-library("ggplot2")
+
 
 load("Temperature.RData", verbose = TRUE)
 
