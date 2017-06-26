@@ -28,7 +28,7 @@ table(temperature$logger, year(temperature$date))
 table(temperature$site, year(temperature$date))
 
 # plot logger by site
-plot_climate(start_date = "2008.1.1", end_date = "2018.1.1", log = c("temp2"), inc = TRUE, SITE = "Fau")
+plot_climate(start_date = "2008.1.1", end_date = "2018.1.1", log = c("tempsoil"), inc = TRUE, SITE = "Lav")
 
 
 # Find file names
@@ -90,7 +90,7 @@ temperature$logger[temperature$file == "Arhelleren_08072009.txt" & temperature$l
 # OVSTEDAL
 # flag temp2 between 2011 and 2015; largeBias from Dec 2012 - 2015
 temperature$flag[temperature$site == "Ovs" & temperature$logger == "temp2" & year(temperature$date) > 2011 & year(temperature$date) < 2015] <- "bias"
-temperature$flag[temperature$site == "Ovs" & temperature$logger == "temp2" & temperature$date >= "2012-12-01 00:00:00" & year(temperature$date) < 2015] <- "biasLarge"
+temperature$flag[temperature$site == "Ovs" & temperature$logger == "temp2" & temperature$file %in% c("Øvstedal_met1_20160511_20160523.txt",  "Øvstedal_met1_Fall2016.txt","Øvstedal_met1_spring2016.txt", "Øvstedal_met1_Spring2017.txt")] <- "biasLarge"
 
 # VESKRE
 # flag temp2 after November 2011 until Sept 2013
@@ -135,7 +135,6 @@ temperature$flag[temperature$site == "Alr" & temperature$logger == "tempabove" &
 temperature$flag[temperature$site == "Alr" & temperature$logger == "tempsoil" & temperature$date > "2010-04-01 00:00:00" & temperature$date < "2010-09-01 00:00:00"] <- "VarianceProblem"
 temperature$flag[temperature$site == "Alr" & temperature$logger == "tempsoil" & temperature$date > "2015-04-01 00:00:00" & temperature$date < "2016-06-01 00:00:00"] <- "VarianceProblem"
 
-
 # ULVHAUGEN
 # switch temp1 to soil and temp2 to abovegroun
 temperature <- temperature %>% 
@@ -151,9 +150,11 @@ temperature$flag[temperature$site == "Lav" & temperature$logger == "tempsoil" & 
 # Flag few and strange data points for both loggers in 2013
 temperature$flag[temperature$site == "Lav" & year(temperature$date) == "2013" & temperature$logger == "temp1"] <- "FewData"
 temperature$flag[temperature$site == "Lav" & year(temperature$date) == "2013" & temperature$logger == "temp2"] <- "FewData"
-# Flag wrong data points for both loggers in 2012
+# Remove wrong data points in 2012/2013
 temperature <- temperature %>% 
-  mutate(flag = ifelse(file == "Lavisdalen_met1.txt", "wrongValues", flag))
+  mutate(value = ifelse(logger == "tempabove", file %in% c("Lavisdalen_met1.txt", "Lavisdalen_met1 (2).txt"), NA, value)) %>% 
+  mutate(value = ifelse(logger == "tempsoil", file %in% c("Lavisdalen_08062011_25102011.txt", "Lavisdalen-met1-20120913.txt", "Lavisdalen_met1 (2).txt"), NA, value))
+
 
 
 # GUDMEDALEN
@@ -180,7 +181,7 @@ temperature$logger[temperature$logger == "temp2"] <- "tempsoil"
 
 # order sites
 temperature <- temperature %>% 
-  mutate(site = factor(site, levels = c("Fau", "Alr", "Ulv", "Vik", "Hog", "Lav", "Arh", "Ram", "Gud", "Ovs", "Ves", "Skj")))
+  mutate(site = factor(site, levels = c("Fau", "Vik", "Arh", "Ovs", "Alr", "Hog", "Ram", "Ves", "Ulv", "Lav", "Gud", "Skj")))
 
 #fill missing dates with NA y merging with complete dataset
 filler <- expand.grid(
