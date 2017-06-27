@@ -1,7 +1,7 @@
 #### Figures Sciece Paper ####
 
 meta.data <- data.frame(site = c("Fau", "Alr", "Ulv", "Vik", "Hog", "Lav", "Arh", "Ram", "Gud", "Ovs", "Ves",  "Skj"),
-                        T_level = rep(c(3,2,1), 4),
+                        T_level = rep(c("boreal","subalpine","alpine"), 4),
                         P_level = c(1,1,1,2,2,2,3,3,3,4,4,4))
 
 # select dates where all sites have climate data up until end of 2015
@@ -9,8 +9,8 @@ temperaturedata <- temperature %>%
   filter(date > "2009-07-02 00:00:00" & date < "2015-12-31 23:00:00") %>% 
   mutate(flag = ifelse(is.na(flag), "ok", flag)) %>% 
   filter(flag != "FewData") %>% 
-  filter(flag != "wrongValues") %>% 
   left_join(meta.data, by = "site")
+
 
 
 temperaturedata %>% 
@@ -37,15 +37,19 @@ full_grid <- expand.grid(logger = unique(monthlyTemperaturedata$logger), site = 
 
 monthlyTemperaturedata <- left_join(full_grid, monthlyTemperaturedata) %>% tbl_df()
 
+save(temperaturedata, file = "temperaturedata.RData")
+save(monthlyTemperaturedata, file = "monthlyTemperaturedata.RData")
+
 
 monthlyAirTemp <- monthlyTemperaturedata %>% 
   filter(logger == "temp200cm") %>% 
+  mutate(T_level = factor(T_level, levels = c("boreal","subalpine","alpine"))) %>% 
   group_by(T_level, date) %>% 
   summarise(mean = mean(value, na.rm = TRUE)) %>% 
   ggplot(aes(x = date, y = mean, color = T_level)) +
   geom_line() +
   labs(x = "", y = "Monthly air temperature in °C") +
-  scale_color_manual(name = "Temperature level", values = c("orange", "red", "darkred")) +
+  scale_color_manual(name = "Temperature level", values = c("darkred", "red", "orange")) +
   theme_minimal()
 ggsave("monthlyAirTemp.pdf", path = "~/Desktop")
 
@@ -73,25 +77,27 @@ climate2 <- climate %>%
 
 # calculate monthly values
 monthlyClimate2 <- climate2 %>%
+  select(Site, Date, Precipitation, Temperature) %>% 
   mutate(Date = dmy(paste0("15-",format(Date, "%b.%Y")))) %>%
-  gather(key = logger, value = value, -Site, -Year, -Month, -Day, -Date) %>% 
-  group_by(Date, logger, Site) %>%
-  summarise(n = n(), value = mean(value), sum = sum(value)) %>%
-  mutate(value = ifelse(logger == "Precipitation", sum, value)) %>% 
+  gather(key = logger, value = value, -Site, -Date) %>% 
+  group_by(Date, Site, logger) %>%
+  summarise(n = n(), mean = mean(value), sum = sum(value)) %>% 
+  mutate(mean = ifelse(logger == "Precipitation", sum, mean)) %>% 
   select(-n, -sum) %>% 
-  rename(date = Date, site = Site) %>% 
+  rename(date = Date, site = Site, value = mean) %>% 
   left_join(meta.data, by = "site") %>%
-  mutate(T_level = factor(T_level), P_level = factor(P_level))
+  mutate(T_level = factor(T_level, levels = c("boreal","sub-alpine","alpine")), P_level = factor(P_level))
 
+save(monthlyClimate2, file = "monthlyClimate2.RData")
 
 monthlyPrecip <- monthlyClimate2 %>% 
   filter(logger == "Precipitation") %>% 
   group_by(P_level, date) %>% 
   summarise(mean = mean(value, na.rm = TRUE)) %>% 
   ggplot(aes(x = date, y = mean, color = P_level)) +
-  geom_line() +
+  geom_line(size = 0.8) +
   labs(x = "", y = "Monthly precipitation in mm") +
-  scale_color_manual(name = "Precipitation level", values = c("lightblue", "blue", "darkblue", "black")) +
+  scale_color_manual(name = "Precipitation level", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue")) +
   theme_minimal()
 ggsave("monthlyGriddedPrecip.pdf", path = "~/Desktop")
 
@@ -101,35 +107,41 @@ TetratermT <- monthlyClimate2 %>%
   filter(month(date) %in% c(6,7,8,9))
 
 
-GridPlot <- monthlyClimate2 %>% 
+monthlyClimate2 %>% 
   filter(logger %in% c("Precipitation")) %>%
   filter(year(date) != 2016) %>% 
   bind_rows(TetratermT) %>% 
-  group_by(logger, T_level, P_level) %>% 
+  group_by(logger, T_level, P_level, year(date)) %>% 
   summarise(n = n(), mean = mean(value, na.rm = TRUE), sum = sum(value, na.rm = TRUE), se = sd(value, na.rm = TRUE)/sqrt(n), se_sum = sd(value, na.rm = TRUE)*sqrt(n)) %>% 
   mutate(mean = ifelse(logger == "Precipitation", sum, mean)) %>% 
-  mutate(se = ifelse(logger == "Precipitation", se_sum, se)) %>% 
-  select(-n, -sum, -se_sum) %>% 
-  unite(mean_se, mean, se, sep = "_") %>% 
+  #mutate(se = ifelse(logger == "Precipitation", se_sum, se)) %>% 
+  select(-n, -sum, -se, -se_sum) %>%
+  ungroup(year(date)) %>% 
+  group_by(logger, T_level, P_level) %>%
+  summarise(N = n(), Mean = mean(mean), sqrt = sqrt(N), SE = Mean / sqrt) %>% 
+  unite(mean_se, Mean, SE, sep = "_") %>% 
   spread(key = logger, value = mean_se) %>% 
   separate(col = Precipitation, into = c("P_mean", "P_se"), sep = "_", convert = TRUE) %>% 
   separate(col = Temperature, into = c("T_mean", "T_se"), sep = "_", convert = TRUE) %>%
   ggplot(aes(x = P_mean, xmin = P_mean - P_se, xmax = P_mean + P_se, 
              y = T_mean,ymin = T_mean - T_se, ymax = T_mean + T_se,
              color = P_level, shape = T_level)) +
-  geom_point(size = 3) +
   geom_errorbar() +
   geom_errorbarh() +
+  #ggplot(aes(x = Precipitation, y = Temperature, color = P_level, shape = T_level)) +
+  geom_point(size = 3) +
   labs(x = "Annual precipitation in mm", y = "Tetraterm temperature in °C") +
-  scale_color_manual(name = "Precipitation level", values = c("lightblue", "blue", "darkblue", "black")) +
-  scale_shape_manual(name = "Temperature level", values = c(17, 16, 15)) +
+  scale_color_manual(name = "Precipitation level", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue")) +
+  scale_shape_manual(name = "Temperature level", values = c(15, 16, 17)) +
   theme(legend.position = "top") +
   theme_minimal()
 
 ggsave("GriddedClimateData.pdf", GridPlot, path = "~/Desktop")
 
-  
 
+  
+  
+  
 head(soilmoisture)
 soilmoisture2 %>% 
   filter(site == "Vik") %>%
