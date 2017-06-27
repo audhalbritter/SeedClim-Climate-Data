@@ -1,5 +1,5 @@
 ---
-title: "SeedClim-FunCaBClimateData_2008-2016"
+title: "SeedClim-FunCaBClimateData_2008-2017"
 author: "Aud Halbritter"
 date: "12 2 2017"
 output: html_document
@@ -11,16 +11,14 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache = TRU
 
 ```{r loadStuff, echo = FALSE}
 #Load libraries
-library("ggplot2")
-library("dplyr")
-library("tidyr")
+library("lubridate")
+library("tidyverse")
 
 #load data
 load("Temperature.Rdata")
-load("Daily.Temperature_2008-2016.Rdata")
-load("Monthly.Temperature_2008-2016.Rdata")
-load("Precipitation.Rdata")
-load("Soilmoisture.Rdata")
+load("Monthly.Temperature_2008-2017.Rdata")
+#load("Precipitation.Rdata")
+#load("Soilmoisture.Rdata")
 ```
 
 ##  Overview
@@ -70,6 +68,19 @@ load("Monthly.Temperature_2008-2016.RData", verbose=TRUE)
 ```
 
 
+```{r eval = FALSE} 
+# order sites
+temperature <- temperature %>% 
+  mutate(site = factor(site, levels = c("Skj", "Gud", "Lav", "Ulv", "Ves", "Ram", "Hog", "Alr", "Ovs", "Arh", "Vik", "Fau")))
+
+#fill missing dates with NA y merging with complete dataset
+full_grid <- expand.grid(logger = unique(temperature$logger), site = unique(temperature$site), date = seq(min(temperature$date), max(temperature$date), by = "hour"))
+
+temperature <- left_join(full_grid, temperature) %>% tbl_df()
+
+```
+
+
 ## Plotting the data
 
 Air temperature 2m
@@ -106,53 +117,70 @@ dd <- temperature %>%
 g + ggtitle("Air temperature 0cm")
 ```
 
-Soil temperature 5cm
+Soil temperature -5cm
 
 ```{r}
 dd <- temperature %>% 
   filter(logger == "tempsoil")
 
-g + ggtitle("Soil temperature")
+g + ggtitle("Soil temperature -5cm")
 ```
 
-
-# Daily temperature
-
-```{r}
-dd <- dailyTemperature %>% 
-  filter(logger == "temp200cm")
-
-g <- ggplot(dd, aes(x = date, y = value, color = site)) +
-  geom_line() +
-  scale_colour_brewer(palette="Paired") +
-  facet_wrap(~ site) + 
-  theme(legend.position="none") +
-  ggtitle("Daily air temperature 2m")
-
-g
-```
 
 # Monthly temperature
 
+Monthly air temperature 2m
 ```{r}
 
-ggplot(monthlyTemperature, aes(x = date, y = value, color = logger)) +
-  geom_line() +
-  facet_wrap(~ site) + 
-  ylim(-15, 25) +
-  ggtitle("Monthly temperature")
+monthlyTemperature %>% 
+   filter(logger == "temp200cm") %>% 
+   ggplot(aes(x = date, y = value, color = site)) +
+   geom_line() +
+   scale_colour_brewer(palette="Paired") +
+   facet_wrap(~ site) + 
+   ggtitle("Monthly temperature 2m")
+
+```
+
+Monthly air temperature 30cm
+```{r}
+
+monthlyTemperature %>% 
+   filter(logger == "temp30cm") %>% 
+   ggplot(aes(x = date, y = value, color = site)) +
+   geom_line() +
+   scale_colour_brewer(palette="Paired") +
+   facet_wrap(~ site) + 
+   ggtitle("Monthly temperature 30cm")
+
+```
+
+Monthly ground temperature 0cm
+```{r}
+
+monthlyTemperature %>% 
+   filter(logger == "tempabove") %>% 
+   ggplot(aes(x = date, y = value, color = site)) +
+   geom_line() +
+   scale_colour_brewer(palette="Paired") +
+   facet_wrap(~ site) + 
+   ggtitle("Monthly temperature 0cm")
+
+```
+
+Monthly soil temperature -5cm
+```{r}
+
+monthlyTemperature %>% 
+   filter(logger == "tempsoil") %>% 
+   ggplot(aes(x = date, y = value, color = site)) +
+   geom_line() +
+   scale_colour_brewer(palette="Paired") +
+   facet_wrap(~ site) + 
+   ggtitle("Monthly temperature -5cm")
 
 ```
 
 
-# Hourly precipitation
 
-```{r}
-ggplot(precipitation, aes(x = date, y = value, color = site)) +
-  geom_line() +
-  scale_colour_brewer(palette="Paired") +
-  facet_wrap(~ site) + 
-  theme(legend.position="none") +
-  ggtitle("Precipitation")
-```
 

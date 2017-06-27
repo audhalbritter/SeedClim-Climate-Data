@@ -183,7 +183,7 @@ temperature$logger[temperature$logger == "temp2"] <- "tempsoil"
 
 # order sites
 temperature <- temperature %>% 
-  mutate(site = factor(site, levels = c("Fau", "Vik", "Arh", "Ovs", "Alr", "Hog", "Ram", "Ves", "Ulv", "Lav", "Gud", "Skj")))
+  mutate(site = factor(site, levels = c("Skj", "Gud", "Lav", "Ulv", "Ves", "Ram", "Hog", "Alr", "Ovs", "Arh", "Vik", "Fau")))
 
 #fill missing dates with NA y merging with complete dataset
 full_grid <- expand.grid(logger = unique(temperature$logger), site = unique(temperature$site), date = seq(min(temperature$date), max(temperature$date), by = "hour"))
