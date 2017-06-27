@@ -28,7 +28,7 @@ table(temperature$logger, year(temperature$date))
 table(temperature$site, year(temperature$date))
 
 # plot logger by site
-plot_climate(start_date = "2008.1.1", end_date = "2018.1.1", log = c("tempsoil"), inc = TRUE, SITE = "Lav")
+plot_climate(start_date = "2008.1.1", end_date = "2010.1.1", log = c("temp200cm"), inc = TRUE, SITE = "Arh")
 
 
 # Find file names
@@ -153,7 +153,7 @@ temperature$flag[temperature$site == "Lav" & year(temperature$date) == "2013" & 
 # Remove wrong data points in 2012/2013
 temperature <- temperature %>% 
   mutate(value = ifelse(logger == "tempabove" & file %in% c("Lavisdalen_met1.txt", "Lavisdalen_met1 (2).txt"), NA, value)) %>% 
-  mutate(value = ifelse(logger == "tempsoil" & file %in% c("Lavisdalen_08062011_25102011.txt", "Lavisdalen-met1-20120913.txt", "Lavisdalen_met1 (2).txt"), NA, value))
+  mutate(value = ifelse(logger == "tempsoil" & file %in% c("Lavisdalen_08062011_25102011.txt", "Lavisdalen-met1-20120913.txt", "Lavisdalen_met1 (2).txt", "Lavisdalen_met1.txt"), NA, value))
 
 
 # GUDMEDALEN
@@ -173,6 +173,9 @@ temperature$flag[temperature$site == "Skj" & year(temperature$date) == "2012" & 
 temperature$logger[temperature$site == "Skj" & temperature$date > "2015-01-01 00:00" & temperature$date < "2016-10-04 12:00" & temperature$logger == "temp1"] <- "tempsoil"
 temperature$logger[temperature$site == "Skj" & temperature$date > "2015-01-01 00:00" & temperature$date < "2016-10-04 12:00" & temperature$logger == "temp2"] <- "tempabove"
 
+# remove everything begore 1.10.2008, values too high
+temperature <- temperature %>% 
+  filter(date > "2008-10-01 00:00:00")
 
 # Change remaining logger names
 temperature$logger[temperature$logger == "temp1"] <- "tempabove"
@@ -183,16 +186,8 @@ temperature <- temperature %>%
   mutate(site = factor(site, levels = c("Fau", "Vik", "Arh", "Ovs", "Alr", "Hog", "Ram", "Ves", "Ulv", "Lav", "Gud", "Skj")))
 
 #fill missing dates with NA y merging with complete dataset
-filler <- expand.grid(
-  site = unique(temperature$site),
-  logger = unique(temperature$logger),
-  date = seq(
-    min(temperature$date),
-    max(temperature$date),
-    by = "hour"
-  )
-)
-temperature <- merge(temperature, filler, all = TRUE)
+full_grid <- expand.grid(logger = unique(temperature$logger), site = unique(temperature$site), date = seq(min(temperature$date), max(temperature$date), by = "hour"))
 
+temperature <- left_join(full_grid, temperature) %>% tbl_df()
 
 save(temperature, file = "Temperature.RData")
