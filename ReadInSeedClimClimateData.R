@@ -152,9 +152,8 @@ temperature$flag[temperature$site == "Lav" & year(temperature$date) == "2013" & 
 temperature$flag[temperature$site == "Lav" & year(temperature$date) == "2013" & temperature$logger == "temp2"] <- "FewData"
 # Remove wrong data points in 2012/2013
 temperature <- temperature %>% 
-  mutate(value = ifelse(logger == "tempabove", file %in% c("Lavisdalen_met1.txt", "Lavisdalen_met1 (2).txt"), NA, value)) %>% 
-  mutate(value = ifelse(logger == "tempsoil", file %in% c("Lavisdalen_08062011_25102011.txt", "Lavisdalen-met1-20120913.txt", "Lavisdalen_met1 (2).txt"), NA, value))
-
+  mutate(value = ifelse(logger == "tempabove" & file %in% c("Lavisdalen_met1.txt", "Lavisdalen_met1 (2).txt"), NA, value)) %>% 
+  mutate(value = ifelse(logger == "tempsoil" & file %in% c("Lavisdalen_08062011_25102011.txt", "Lavisdalen-met1-20120913.txt", "Lavisdalen_met1 (2).txt"), NA, value))
 
 
 # GUDMEDALEN
