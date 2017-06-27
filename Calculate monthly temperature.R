@@ -7,33 +7,33 @@ library("tidyverse")
 load("Temperature.RData", verbose = TRUE)
 
 #### Calculate monthly means ####
-threshold <- 7 * 24 #~ one week. Minimum accepted
+threshold <-  3 * 7 * 24 # three weeks. Minimum accepted
 
 monthlyTemperature <- temperature %>%
   filter(!is.na(value)) %>%
   mutate(date = dmy(paste0("15-",format(date, "%b.%Y")))) %>%
   group_by(date, logger, site) %>%
   summarise(n = n(), value = mean(value), sum = sum(value)) %>%
-  #filter(n > threshold) %>%
+  filter(n > threshold) %>%
   select(-n, -sum)
 
 
-#fill missing months with NA y merging with complete dataset
-filler <- expand.grid(
-  site = unique(monthlyTemperature$site),
-  logger = unique(monthlyTemperature$logger),
-  date = seq(
-    min(monthlyTemperature$date),
-    max(monthlyTemperature$date),
-    by = "month"
-  )
-)
-monthlyTemperature <- merge(monthlyTemperature, filler, all = TRUE)
+#fill missing dates with NA y merging with complete dataset
+full_grid <- expand.grid(logger = unique(monthlyTemperature$logger), site = unique(monthlyTemperature$site), date = seq(min(monthlyTemperature$date), max(monthlyTemperature$date), by = "month"))
+
+monthlyTemperature <- left_join(full_grid, monthlyTemperature) %>% tbl_df()
 
 monthlyTemperature$site <- factor(monthlyTemperature$site, levels=c("Skj", "Gud", "Lav", "Ulv", "Ves", "Ram", "Hog", "Alr", "Ovs", "Arh", "Vik", "Fau"))
 
-save(monthlyTemperature, file = "Monthly.Temperature_2008-2016.RData")
+save(monthlyTemperature, file = "Monthly.Temperature_2008-2017.RData")
 
+monthlyTemperature %>% 
+  filter(logger == "tempabove") %>% 
+  ggplot(aes(x = date, y = value, color = site)) +
+  geom_line() +
+  scale_colour_brewer(palette="Paired") +
+  facet_wrap(~ site) + 
+  ggtitle("Monthly temperature")
 
 
 # Rbind gridded and Seedclim data
