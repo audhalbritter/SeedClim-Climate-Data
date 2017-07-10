@@ -24,7 +24,7 @@ dd %>%
 ReadIniButtons <- function(textfile){
   # import body of data
   dat <- read_csv(textfile, skip = 19)
-  dat$Date <- dmy_hms(dat$`Date/Time`) # convert to date
+  dat$Date <- mdy_hms(dat$`Date/Time`) # convert to date
   
   # extract site and file name from file name
   dat$iButtonID <- basename(textfile)
@@ -47,6 +47,11 @@ mdat <- plyr::ldply(as.list(myfiles), ReadIniButtons)
 head(mdat)
 
 mdat %>% 
-  left_join()
+  left_join() %>% 
+  mutate(Year = 2016)
 
-
+mdat %>% 
+  filter(siteID == "Gudmedalen") %>% 
+  ggplot(aes(x = Date, y = Value)) +
+  geom_line() +
+  facet_wrap(~ iButtonID)
