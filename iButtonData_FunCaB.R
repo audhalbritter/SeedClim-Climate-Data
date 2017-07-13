@@ -19,7 +19,6 @@ write.csv(ddd, "iButtonID.csv")
 #### Read in iButtons Function
 ReadIniButtons <- function(textfile){
   ending <- substr(textfile, nchar(textfile)-4+1, nchar(textfile))
-  print(textfile)
   # Extract Date, Unit and Value
  if(ending == ".txt"){
     dat <- read_delim(textfile, delim = ",", col_names = FALSE)
@@ -56,21 +55,17 @@ ReadIniButtons <- function(textfile){
 
 
 # MAKE LIST OF ALL TXT FILES AND MERGE THEM TO ONE DATA FRAME
-myfiles.1 <- dir(path = paste0("/Volumes/FELLES/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/iButtondata"), pattern = "csv", recursive = TRUE, full.names = TRUE)
-myfiles.2 <- dir(path = paste0("/Volumes/FELLES/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/iButtondata"), pattern = "txt", recursive = TRUE, full.names = TRUE)
-myfiles.2 <- myfiles.2[-c(1,2,23)] # remove log files
+myfiles <- dir(path = paste0("/Volumes/FELLES/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/iButtondata"), pattern = "csv|txt", recursive = TRUE, full.names = TRUE)
+myfiles <- myfiles[!grepl("log", myfiles, ignore.case = TRUE)] # remove log files
 
-mdat <- plyr::ldply(as.list(myfiles.1), ReadIniButtons)
+mdat <- map_df(myfiles, ReadIniButtons)
 head(mdat)
-mdat2 <- plyr::ldply(as.list(myfiles.2), ReadIniButtons)
-head(mdat2)
-mdat <- mdat %>% 
-  bind_rows(mdat2)
 
 save(mdat, file = "iButton2016.RData")
 
 mdat %>% 
   filter(siteID == "Gudmedalen") %>% 
+  filter(format(Date, "%Y-%m-%d") == "2015-08-12") %>% print(n = 100)
   filter(Value > -40, Value < 50) %>%
   ggplot(aes(x = Date, y = Value)) +
   geom_line() +
