@@ -2,6 +2,7 @@
 library("tidyverse")
 library("lubridate")
 library("readr")
+library("readxl")
 
 
 # Extract file names from all iButton files to create dictionary
@@ -51,8 +52,10 @@ ReadIniButtons <- function(textfile){
 
 
 # read in iButtonID dictionary
+dictionary <- read_excel(path = "iButtonID_2016.xlsx", sheet = 1, col_names = TRUE)
 
-
+dictionary <- dictionary %>% 
+  mutate(Block = plyr::mapvalues(Block, c("FCIII", "FCII", "FCI", "FCV", "FCIV", "FCXV", "FCXII", "FCXIII", "FCI ", "FCVI", "FCVIII", "IX", "II", "V", "E2"), c("3", "2", "1", "5", "4", "15", "12", "13", "1","6", "8", "9", "2", "5", "E2")))
 
 # MAKE LIST OF ALL TXT FILES AND MERGE THEM TO ONE DATA FRAME
 myfiles <- dir(path = paste0("/Volumes/FELLES/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/iButtondata"), pattern = "csv|txt", recursive = TRUE, full.names = TRUE)
@@ -61,15 +64,20 @@ myfiles <- myfiles[!grepl("log", myfiles, ignore.case = TRUE)] # remove log file
 mdat <- map_df(myfiles, ReadIniButtons)
 head(mdat)
 
-save(mdat, file = "iButton2016.RData")
+iButtonData <- mdat %>% 
+  mutate(Year = as.numeric(Year)) %>% 
+  left_join(dictionary, by = c("Year", "siteID", "iButtonID"))
 
-mdat %>% 
-  filter(siteID == "Gudmedalen") %>% 
-  filter(format(Date, "%Y-%m-%d") == "2015-08-12") %>% print(n = 100)
+save(iButtonData, file = "iButton2016.RData")
+load(file = "iButton2016.RData")
+
+iButtonData %>% 
+  filter(siteID == "Fauske") %>% 
+  filter(format(Date, "%Y-%m-%d") == "2015-08-20") %>%
   filter(Value > -40, Value < 50) %>%
-  ggplot(aes(x = Date, y = Value)) +
+  ggplot(aes(x = Date, y = Value, color = Block)) +
   geom_line() +
-  facet_wrap(~ iButtonID)
+  facet_wrap(~ Treatment)
 
 mdat %>% 
   filter(!iButtonID %in% c("3E369341.csv", "3E3DF841.csv")) %>% # remove 2 iButtons from Gudmeldalen; these loggers need to be checked!!!
