@@ -7,7 +7,7 @@ output: word_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache = TRUE, dpi = 300)
 ```
 
 ```{r loadStuff, echo = FALSE}
@@ -42,6 +42,7 @@ monthlyTemperaturedata %>%
   theme_minimal()
 
 ```
+
 Figure S1.1. Time series of monthly average temperature for alpine (orange), sub-alpine (red) and boreal (darlred) sites measured at 2m above ground.
 
 
@@ -59,6 +60,7 @@ monthlyClimate2 %>%
   scale_color_manual(name = "Precipitation level", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue")) +
   theme_minimal()
 ```
+
 Figure S1.2. Time series of sum of monthly precipitation averaged across sites for each precipitation level according to increasing precipitation levels (500mm, 1200mm, 2000mm, 2700mm) from light to dark blue. 
 
 
@@ -67,27 +69,23 @@ The grid was set up with annual precipitaiton and tetraterm temperatures, i.e. a
 When tetraterm temperatures are plotted against total annual precipitation estimated from the met.no 1km time series, we see that the grid is confirmed.
 
 ```{r, echo=FALSE}
-# Filter tetraterm temperature
-TetratermT <- monthlyClimate2 %>% 
-  filter(logger %in% c("Temperature")) %>%
-  filter(month(date) %in% c(6,7,8,9))
 
-# Filter tetraterm temperature
+# Filter precipitation and tetraterm temperature
 monthlyClimate2 %>% 
-  filter(logger %in% c("Precipitation")) %>%
+  filter(logger == "Temperature" & month(date) %in% 6:9 | logger == "Precipitation") %>% 
   filter(year(date) != 2016) %>% 
-  bind_rows(TetratermT) %>% 
   group_by(logger, T_level, P_level, year(date)) %>% 
-  summarise(n = n(), mean = mean(value, na.rm = TRUE), sum = sum(value, na.rm = TRUE), se = sd(value, na.rm = TRUE)/sqrt(n), se_sum = sd(value, na.rm = TRUE)*sqrt(n)) %>% 
+  summarise(n = n(), mean = mean(value, na.rm = TRUE), sum = sum(value, na.rm = TRUE)) %>% 
   mutate(mean = ifelse(logger == "Precipitation", sum, mean)) %>% 
-  #mutate(se = ifelse(logger == "Precipitation", se_sum, se)) %>% 
-  select(-n, -sum, -se, -se_sum) %>% 
-  summarise(N = n(), Mean = mean(mean), se = sd(Mean, na.rm = TRUE / sqrt(N))) %>% 
-  #unite(mean_se, mean, se, sep = "_") %>% 
-  spread(key = logger, value = Mean) %>% 
-  #separate(col = Precipitation, into = c("P_mean", "P_se"), sep = "_", convert = TRUE) %>% 
-  #separate(col = Temperature, into = c("T_mean", "T_se"), sep = "_", convert = TRUE) %>%
-  ggplot(aes(x = Precipitation, y = Temperature, color = P_level, shape = T_level)) +
+  group_by(logger, T_level, P_level) %>% 
+  summarise(N = n(), Mean = mean(mean), SE = sd(mean, na.rm = TRUE) / sqrt(N)) %>% 
+  unite(Mean_SE, Mean, SE, sep = "_") %>% 
+  spread(key = logger, value = Mean_SE) %>% 
+  separate(col = Precipitation, into = c("P_mean", "P_se"), sep = "_", convert = TRUE) %>% 
+  separate(col = Temperature, into = c("T_mean", "T_se"), sep = "_", convert = TRUE) %>%
+  ggplot(aes(x = P_mean, xmin = P_mean - P_se, xmax = P_mean + P_se, y = T_mean, ymin = T_mean -T_se, ymax = T_mean + T_se, color = P_level, shape = T_level)) +
+  geom_errorbar() +
+  geom_errorbarh() +
   geom_point(size = 3) +
   labs(x = "Annual precipitation in mm", y = "Tetraterm temperature in °C") +
   scale_color_manual(name = "Precipitation level", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue")) +

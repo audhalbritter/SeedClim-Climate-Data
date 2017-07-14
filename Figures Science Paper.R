@@ -109,16 +109,18 @@ TetratermT <- monthlyClimate2 %>%
 
 monthlyClimate2 %>% 
   filter(logger %in% c("Precipitation")) %>%
-  filter(year(date) != 2016) %>% 
+  filter(!year(date) %in% c(2009, 2016)) %>% 
   bind_rows(TetratermT) %>% 
+  # mean/sum for each year
   group_by(logger, T_level, P_level, year(date)) %>% 
-  summarise(n = n(), mean = mean(value, na.rm = TRUE), sum = sum(value, na.rm = TRUE), se = sd(value, na.rm = TRUE)/sqrt(n), se_sum = sd(value, na.rm = TRUE)*sqrt(n)) %>% 
+  summarise(n = n(), mean = mean(value, na.rm = TRUE), sum = sum(value, na.rm = TRUE), SD = sd(value, na.rm = TRUE)) %>% 
   mutate(mean = ifelse(logger == "Precipitation", sum, mean)) %>% 
-  #mutate(se = ifelse(logger == "Precipitation", se_sum, se)) %>% 
-  select(-n, -sum, -se, -se_sum) %>%
+  select(-n, -sum) %>%
+  # mean across years
   ungroup(year(date)) %>% 
   group_by(logger, T_level, P_level) %>%
-  summarise(N = n(), Mean = mean(mean), sqrt = sqrt(N), SE = Mean / sqrt) %>% 
+  summarise(N = n(), Mean = mean(mean), SE = mean(SD)/sqrt(N)) %>% 
+  select(-N) %>%
   unite(mean_se, Mean, SE, sep = "_") %>% 
   spread(key = logger, value = mean_se) %>% 
   separate(col = Precipitation, into = c("P_mean", "P_se"), sep = "_", convert = TRUE) %>% 
@@ -135,12 +137,10 @@ monthlyClimate2 %>%
   scale_shape_manual(name = "Temperature level", values = c(15, 16, 17)) +
   theme(legend.position = "top") +
   theme_minimal()
-
-ggsave("GriddedClimateData.pdf", GridPlot, path = "~/Desktop")
-
+  
 
   
-  
+ 
   
 head(soilmoisture)
 soilmoisture2 %>% 
@@ -177,3 +177,29 @@ monthlySoilmoisture <- ggplot(monthlySoilmoisture, aes(x = date, y = value, colo
   theme_minimal()
   
 ggsave("monthlySoilmoisture.pdf", path = "~/Desktop")  
+
+
+
+
+# Filter precipitation and tetraterm temperature
+monthlyClimate2 %>% 
+  filter(logger == "Temperature" & month(date) %in% 6:9 | logger == "Precipitation") %>% 
+  filter(year(date) != 2016) %>% 
+  group_by(logger, T_level, P_level, year(date)) %>% 
+  summarise(n = n(), mean = mean(value, na.rm = TRUE), sum = sum(value, na.rm = TRUE)) %>% 
+  mutate(mean = ifelse(logger == "Precipitation", sum, mean)) %>% 
+  group_by(logger, T_level, P_level) %>% 
+  summarise(N = n(), Mean = mean(mean), SE = sd(mean, na.rm = TRUE) / sqrt(N)) %>% 
+  unite(Mean_SE, Mean, SE, sep = "_") %>% 
+  spread(key = logger, value = Mean_SE) %>% 
+  separate(col = Precipitation, into = c("P_mean", "P_se"), sep = "_", convert = TRUE) %>% 
+  separate(col = Temperature, into = c("T_mean", "T_se"), sep = "_", convert = TRUE) %>%
+  ggplot(aes(x = P_mean, xmin = P_mean - P_se, xmax = P_mean + P_se, y = T_mean, ymin = T_mean -T_se, ymax = T_mean + T_se, color = P_level, shape = T_level)) +
+  geom_errorbar() +
+  geom_errorbarh() +
+  geom_point(size = 3) +
+  labs(x = "Annual precipitation in mm", y = "Tetraterm temperature in °C") +
+  scale_color_manual(name = "Precipitation level", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue")) +
+  scale_shape_manual(name = "Temperature level", values = c(15, 16, 17)) +
+  theme(legend.position = "top") +
+  theme_minimal()
