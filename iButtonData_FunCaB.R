@@ -61,6 +61,7 @@ dictionary <- dictionary %>%
 myfiles <- dir(path = paste0("/Volumes/FELLES/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/iButtondata"), pattern = "csv|txt", recursive = TRUE, full.names = TRUE)
 myfiles <- myfiles[!grepl("log", myfiles, ignore.case = TRUE)] # remove log files
 
+
 mdat <- map_df(myfiles, ReadIniButtons)
 head(mdat)
 
@@ -72,8 +73,8 @@ save(iButtonData, file = "iButton2016.RData")
 load(file = "iButton2016.RData")
 
 iButtonData %>% 
-  filter(siteID == "Fauske") %>% 
-  filter(format(Date, "%Y-%m-%d") == "2015-08-20") %>%
+  filter(siteID == "Alrust") %>% 
+  filter(format(Date, "%Y-%m-%d") == "2015-09-20") %>%
   filter(Value > -40, Value < 50) %>%
   ggplot(aes(x = Date, y = Value, color = Block)) +
   geom_line() +
@@ -82,8 +83,6 @@ iButtonData %>%
 mdat %>% 
   filter(!iButtonID %in% c("3E369341.csv", "3E3DF841.csv")) %>% # remove 2 iButtons from Gudmeldalen; these loggers need to be checked!!!
   filter(Value > -40, Value < 50) %>% # crop impossible values
-  group_by(siteID, Date, Year) %>% 
-  summarise(mean = mean(Value)) %>% 
-  ggplot(aes(x = Date, y = mean)) +
+  ggplot(aes(x = Date, y = Value)) +
   geom_line() +
   facet_wrap(~ siteID)
