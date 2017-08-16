@@ -146,7 +146,7 @@ Longterm <- data_frame(T_level = as.factor(c(rep("boreal", 4), rep("subalpine", 
                        P_level = as.factor(c(rep(c(1,2,3,4),3))),
                        P_mean = c(600, 1161, 2044, 2923, 789, 1356, 1848, 3029, 596, 1321, 1925, 2725),
                        T_mean = c(10.3, 10.55, 10.6, 10.78, 9.14, 9.17, 8.77, 8.67, 6.17, 6.45, 5.87, 6.58),
-                       logger = "50 years")
+                       logger = "30 year normal")
 
 
 
@@ -164,19 +164,19 @@ monthlyClimate2 %>%
   separate(col = Precipitation, into = c("P_mean", "P_se"), sep = "_", convert = TRUE) %>% 
   separate(col = Temperature, into = c("T_mean", "T_se"), sep = "_", convert = TRUE) %>%
   select(-N) %>% 
-  mutate(logger = "5 years") %>% 
+  mutate(logger = "7 year gridded") %>% 
   bind_rows(Longterm) %>%
   ungroup() %>% 
   mutate(P_level = factor(P_level, levels = c(1,2,3,4))) %>% 
   mutate(T_level = factor(T_level, levels = c("boreal", "subalpine", "alpine"))) %>% 
-  ggplot(aes(x = P_mean, xmin = P_mean - P_se, xmax = P_mean + P_se, y = T_mean, ymin = T_mean -T_se, ymax = T_mean + T_se, color = P_level, shape = T_level, fill = factor(ifelse(logger == "5 years", P_level, logger)))) +
+  ggplot(aes(x = P_mean, xmin = P_mean - P_se, xmax = P_mean + P_se, y = T_mean, ymin = T_mean -T_se, ymax = T_mean + T_se, color = P_level, shape = T_level, fill = factor(ifelse(logger == "7 year gridded", P_level, logger)))) +
   geom_errorbar() +
   geom_errorbarh() +
   geom_point(aes(size = logger)) +
   labs(x = "Annual precipitation in mm", y = "Tetraterm temperature in °C") +
   scale_color_manual(name = "Precipitation level", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue")) +
   scale_shape_manual(name = "Temperature level", values = c(25, 21, 24)) +
-  scale_fill_manual(name = "Data", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue", "white")) +
-  scale_size_manual(name = "logger", values = c(3, 3.01))+
-  guides(fill = "none", size = guide_legend(override.aes = list(shape = c(16, 1)))) +
+  scale_fill_manual(name = "Data", values = c("lightsteelblue1", "skyblue1", "steelblue3", "white", "midnightblue")) +
+  scale_size_manual(name = "Source", values = c(3, 3.01))+
+  guides(fill = "none", size = guide_legend(override.aes = list(shape = c(1, 16)))) +
   theme_minimal()
