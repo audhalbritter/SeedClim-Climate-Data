@@ -14,11 +14,19 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache = TRU
 #Load libraries
 library("lubridate")
 library("tidyverse")
+library("ggplot2")
 
 #load data
 load("temperaturedata.Rdata")
 load("monthlyTemperaturedata.RData")
 load("monthlyClimate2.Rdata")
+
+Longterm <- data_frame(T_level = as.factor(c(rep("boreal", 4), rep("subalpine", 4), rep("alpine", 4))),
+                       P_level = as.factor(c(rep(c(1,2,3,4),3))),
+                       P_mean = c(600, 1161, 2044, 2923, 789, 1356, 1848, 3029, 596, 1321, 1925, 2725),
+                       T_mean = c(10.3, 10.55, 10.6, 10.78, 9.14, 9.17, 8.77, 8.67, 6.17, 6.45, 5.87, 6.58),
+                       logger = "30 year normal")
+
 
 ```
 
@@ -27,7 +35,7 @@ load("monthlyClimate2.Rdata")
 The climate grid (Figure 1 in main text) was set up on the basis of downscaled climate data (data from met.no). In this supplement we explore patterns weather data measured locally at the SeedClim sites to confirm the climate grid with groud data.
 
 # Temperature
-Monthly averages of local temperature measurements differ consistently among alpine, sub-alpine and boreal sites during summer, for air (Figure S1.1) and ground temperatures (not shown). The differences are less clear during spring, autumn and winter.
+Monthly averages of local temperature measurements differ consistently among boreal, sub-alpine and alpine sites during summer, for air (Figure S1.1) and ground temperatures (not shown). The differences are less clear during spring, autumn and winter.
 
 ```{r, echo=FALSE} 
 monthlyTemperaturedata %>% 
@@ -36,18 +44,18 @@ monthlyTemperaturedata %>%
   group_by(T_level, date) %>% 
   summarise(mean = mean(value, na.rm = TRUE)) %>% 
   ggplot(aes(x = date, y = mean, color = T_level)) +
-  geom_line() +
+  geom_line(size = 0.6) +
   labs(x = "", y = "Monthly air temperature in °C") +
   scale_color_manual(name = "Temperature level", values = c("darkred", "red", "orange")) +
   theme_minimal()
 
 ```
 
-Figure S1.1. Time series of monthly average temperature for alpine (orange), sub-alpine (red) and boreal (darlred) sites measured at 2m above ground.
+Figure S1.1. Time series of monthly average temperature for boreal (darlred), sub-alpine (red) and alpine (orange) sites measured at 2m above ground.
 
 
 # Precipitation
-The precipitation data are much noisier than the temperature data (more missing values and outliers), due to bucket/logger failure, but also because much precipitation comes as snow. Here the annual gridded data for 1960-90 (www.met.no) is used.
+The precipitation data are much noisier than the temperature data (more missing values and outliers), due to logger failure and also because precipitation partly falls as snow. Here the annual gridded data for 1960-90 (www.met.no) is used.
 
 ```{r, echo=FALSE} 
 monthlyClimate2 %>% 
@@ -55,7 +63,7 @@ monthlyClimate2 %>%
   group_by(P_level, date) %>% 
   summarise(mean = mean(value, na.rm = TRUE)) %>% 
   ggplot(aes(x = date, y = mean, color = P_level)) +
-  geom_line(size = 0.8) +
+  geom_line(size = 0.6) +
   labs(x = "", y = "Monthly precipitation in mm") +
   scale_color_manual(name = "Precipitation level", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue")) +
   theme_minimal()
@@ -65,8 +73,7 @@ Figure S1.2. Time series of sum of monthly precipitation averaged across sites f
 
 
 # Climate grid
-The grid was set up with annual precipitaiton and tetraterm temperatures, i.e. averages of the months May, June, July, August from gridded data for 1960-90 (www.met.no).
-When tetraterm temperatures are plotted against total annual precipitation estimated from the met.no 1km time series, we see that the grid is confirmed.
+The grid was set up with annual precipitaiton and tetraterm temperatures, i.e. averages of the months May, June, July, August from gridded data for the period of the experiment (7 years). Also shown are the 30 year normal temperature for the period of 1960-90 (www.met.no). This data confirm the grid.
 
 ```{r, echo=FALSE}
 
@@ -83,17 +90,25 @@ monthlyClimate2 %>%
   spread(key = logger, value = Mean_SE) %>% 
   separate(col = Precipitation, into = c("P_mean", "P_se"), sep = "_", convert = TRUE) %>% 
   separate(col = Temperature, into = c("T_mean", "T_se"), sep = "_", convert = TRUE) %>%
-  ggplot(aes(x = P_mean, xmin = P_mean - P_se, xmax = P_mean + P_se, y = T_mean, ymin = T_mean -T_se, ymax = T_mean + T_se, color = P_level, shape = T_level)) +
+  select(-N) %>% 
+  mutate(logger = "7 year gridded") %>% 
+  bind_rows(Longterm) %>%
+  ungroup() %>% 
+  mutate(P_level = factor(P_level, levels = c(1,2,3,4))) %>% 
+  mutate(T_level = factor(T_level, levels = c("boreal", "subalpine", "alpine"))) %>% 
+  ggplot(aes(x = P_mean, xmin = P_mean - P_se, xmax = P_mean + P_se, y = T_mean, ymin = T_mean -T_se, ymax = T_mean + T_se, color = P_level, shape = T_level, fill = factor(ifelse(logger == "7 year gridded", P_level, logger)))) +
   geom_errorbar() +
   geom_errorbarh() +
-  geom_point(size = 3) +
+  geom_point(aes(size = logger)) +
   labs(x = "Annual precipitation in mm", y = "Tetraterm temperature in °C") +
   scale_color_manual(name = "Precipitation level", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue")) +
-  scale_shape_manual(name = "Temperature level", values = c(15, 16, 17)) +
-  theme(legend.position = "top") +
+  scale_shape_manual(name = "Temperature level", values = c(25, 21, 24)) +
+  scale_fill_manual(name = "Data", values = c("lightsteelblue1", "skyblue1", "steelblue3", "white", "midnightblue")) +
+  scale_size_manual(name = "Source", values = c(3, 3.01))+
+  guides(fill = "none", size = guide_legend(override.aes = list(shape = c(1, 16)))) +
   theme_minimal()
 ```
 
-Figure S1.3. Grid of precipitation and tetraterm temperatures. Means of observations across years ± SE (vertical and horizontal error bars). Colors from light to dark blue are according to increasing precipitation levels (500mm, 1200mm, 2000mm, 2700mm). The shape of the symbols represent the temperature levels (boreal: square, sub-alpine: circle, alpine: triangle).
+Figure S1.3. Grid of precipitation and tetraterm temperatures with means of observations across years ± SE (vertical and horizontal error bars). Colors from light to dark blue are according to increasing precipitation levels (500mm, 1200mm, 2000mm, 2700mm). The shape of the symbols represent the temperature levels (boreal: reverse triangle, sub-alpine: circle, alpine: triangle). Closed symbols represent the gridded data over the 7 years of the experiment. Open symbols show the 30 year normal climate data.
 
 
