@@ -86,9 +86,10 @@ monthlyClimate2 <- climate2 %>%
   select(-n, -sum) %>% 
   rename(date = Date, site = Site, value = mean) %>% 
   left_join(meta.data, by = "site") %>%
-  mutate(T_level = factor(T_level, levels = c("boreal","sub-alpine","alpine")), P_level = factor(P_level))
+  mutate(T_level = factor(T_level, levels = c("boreal","subalpine","alpine")), P_level = factor(P_level))
 
 save(monthlyClimate2, file = "monthlyClimate2.RData")
+load("monthlyClimate2.RData", verbose = TRUE)
 
 monthlyPrecip <- monthlyClimate2 %>% 
   filter(logger == "Precipitation") %>% 
@@ -100,44 +101,6 @@ monthlyPrecip <- monthlyClimate2 %>%
   scale_color_manual(name = "Precipitation level", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue")) +
   theme_minimal()
 ggsave("monthlyGriddedPrecip.pdf", path = "~/Desktop")
-
-# Filter tetraterm temperature
-TetratermT <- monthlyClimate2 %>% 
-  filter(logger %in% c("Temperature")) %>%
-  filter(month(date) %in% c(6,7,8,9))
-
-
-monthlyClimate2 %>% 
-  filter(logger %in% c("Precipitation")) %>%
-  filter(!year(date) %in% c(2009, 2016)) %>% 
-  bind_rows(TetratermT) %>% 
-  # mean/sum for each year
-  group_by(logger, T_level, P_level, year(date)) %>% 
-  summarise(n = n(), mean = mean(value, na.rm = TRUE), sum = sum(value, na.rm = TRUE), SD = sd(value, na.rm = TRUE)) %>% 
-  mutate(mean = ifelse(logger == "Precipitation", sum, mean)) %>% 
-  select(-n, -sum) %>%
-  # mean across years
-  ungroup(year(date)) %>% 
-  group_by(logger, T_level, P_level) %>%
-  summarise(N = n(), Mean = mean(mean), SE = mean(SD)/sqrt(N)) %>% 
-  select(-N) %>%
-  unite(mean_se, Mean, SE, sep = "_") %>% 
-  spread(key = logger, value = mean_se) %>% 
-  separate(col = Precipitation, into = c("P_mean", "P_se"), sep = "_", convert = TRUE) %>% 
-  separate(col = Temperature, into = c("T_mean", "T_se"), sep = "_", convert = TRUE) %>%
-  ggplot(aes(x = P_mean, xmin = P_mean - P_se, xmax = P_mean + P_se, 
-             y = T_mean,ymin = T_mean - T_se, ymax = T_mean + T_se,
-             color = P_level, shape = T_level)) +
-  geom_errorbar() +
-  geom_errorbarh() +
-  #ggplot(aes(x = Precipitation, y = Temperature, color = P_level, shape = T_level)) +
-  geom_point(size = 3) +
-  labs(x = "Annual precipitation in mm", y = "Tetraterm temperature in °C") +
-  scale_color_manual(name = "Precipitation level", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue")) +
-  scale_shape_manual(name = "Temperature level", values = c(15, 16, 17)) +
-  theme(legend.position = "top") +
-  theme_minimal()
-  
 
   
  
@@ -179,6 +142,12 @@ monthlySoilmoisture <- ggplot(monthlySoilmoisture, aes(x = date, y = value, colo
 ggsave("monthlySoilmoisture.pdf", path = "~/Desktop")  
 
 
+Longterm <- data_frame(T_level = as.factor(c(rep("boreal", 4), rep("subalpine", 4), rep("alpine", 4))),
+                       P_level = as.factor(c(rep(c(1,2,3,4),3))),
+                       P_mean = c(600, 1161, 2044, 2923, 789, 1356, 1848, 3029, 596, 1321, 1925, 2725),
+                       T_mean = c(10.3, 10.55, 10.6, 10.78, 9.14, 9.17, 8.77, 8.67, 6.17, 6.45, 5.87, 6.58),
+                       logger = "50 years")
+
 
 
 # Filter precipitation and tetraterm temperature
@@ -194,12 +163,20 @@ monthlyClimate2 %>%
   spread(key = logger, value = Mean_SE) %>% 
   separate(col = Precipitation, into = c("P_mean", "P_se"), sep = "_", convert = TRUE) %>% 
   separate(col = Temperature, into = c("T_mean", "T_se"), sep = "_", convert = TRUE) %>%
-  ggplot(aes(x = P_mean, xmin = P_mean - P_se, xmax = P_mean + P_se, y = T_mean, ymin = T_mean -T_se, ymax = T_mean + T_se, color = P_level, shape = T_level)) +
+  select(-N) %>% 
+  mutate(logger = "5 years") %>% 
+  bind_rows(Longterm) %>%
+  ungroup() %>% 
+  mutate(P_level = factor(P_level, levels = c(1,2,3,4))) %>% 
+  mutate(T_level = factor(T_level, levels = c("boreal", "subalpine", "alpine"))) %>% 
+  ggplot(aes(x = P_mean, xmin = P_mean - P_se, xmax = P_mean + P_se, y = T_mean, ymin = T_mean -T_se, ymax = T_mean + T_se, color = P_level, shape = T_level, fill = factor(ifelse(logger == "5 years", P_level, logger)))) +
   geom_errorbar() +
   geom_errorbarh() +
-  geom_point(size = 3) +
+  geom_point(aes(size = logger)) +
   labs(x = "Annual precipitation in mm", y = "Tetraterm temperature in °C") +
   scale_color_manual(name = "Precipitation level", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue")) +
-  scale_shape_manual(name = "Temperature level", values = c(15, 16, 17)) +
-  theme(legend.position = "top") +
+  scale_shape_manual(name = "Temperature level", values = c(25, 21, 24)) +
+  scale_fill_manual(name = "Data", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue", "white")) +
+  scale_size_manual(name = "logger", values = c(3, 3.01))+
+  guides(fill = "none", size = guide_legend(override.aes = list(shape = c(16, 1)))) +
   theme_minimal()
