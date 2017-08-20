@@ -9,6 +9,9 @@ library("readxl")
 myfiles <- dir(path = paste0("/Volumes/FELLES/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/iButtondata/2016"), pattern = "csv", recursive = TRUE, full.names = TRUE)
 myfiles <- dir(path = paste0("/Volumes/FELLES/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/iButtondata/2016"), pattern = "txt", recursive = TRUE, full.names = TRUE)
 myfiles <- tibble(unlist(myfiles))
+# 2017 files
+filenames <- dir(path = paste0("~/Desktop/iButton plots/Arhelleren"), pattern = "txt", recursive = TRUE)
+filenames <- gsub(pattern = ".txt", "", filenames)
 
 ddd <- myfiles %>% 
   separate(col = `unlist(myfiles)`, into = c("a", "b", "c", "d","e","f","g","h","i", "year","siteID", "iButtonID"), sep = "/") %>% 
@@ -19,6 +22,7 @@ write.csv(ddd, "iButtonID.csv")
 
 #### Read in iButtons Function
 ReadIniButtons <- function(textfile){
+  print(textfile)
   ending <- substr(textfile, nchar(textfile)-4+1, nchar(textfile))
   # Extract Date, Unit and Value
  if(ending == ".txt"){
@@ -51,15 +55,26 @@ ReadIniButtons <- function(textfile){
 
 
 
-# read in iButtonID dictionary
-dictionary <- read_excel(path = "iButtonID_2016.xlsx", sheet = 1, col_names = TRUE)
+# read in iButtonID dictionary 2016
+dictionary16 <- read_excel(path = "iButtonID_2016-2017.xlsx", sheet = 1, col_names = TRUE)
 
-dictionary <- dictionary %>% 
+dictionary16 <- dictionary16 %>% 
   mutate(Block = plyr::mapvalues(Block, c("FCIII", "FCII", "FCI", "FCV", "FCIV", "FCXV", "FCXII", "FCXIII", "FCI ", "FCVI", "FCVIII", "IX", "II", "V", "E2"), c("3", "2", "1", "5", "4", "15", "12", "13", "1","6", "8", "9", "2", "5", "E2")))
+
+# read in iButtonID dictionary 2017
+dictionary17 <- read_excel(path = "iButtonID_2016-2017.xlsx", sheet = 2, col_names = TRUE)
+dictionary17 <- dictionary17 %>% 
+  mutate(siteID = plyr::mapvalues(siteID, c("LAV", "GUD", "SKJ", "ULV", "ALR", "FAU", "HOG", "VIK", "RAM", "VES", "OVS", "ARH"), c("Lavisdalen", "Gudmedalen", "Skjellingahaugen", "Ulvhaugen", "Alrust", "Fauske", "Hogsete", "Vikesland", "Rambera", "Veskre", "Ovstedal", "Arhelleren")))
+
+dictionary <- dictionary16 %>% 
+  bind_rows(dictionary17)
+
 
 # MAKE LIST OF ALL TXT FILES AND MERGE THEM TO ONE DATA FRAME
 myfiles <- dir(path = paste0("/Volumes/FELLES/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/iButtondata"), pattern = "csv|txt", recursive = TRUE, full.names = TRUE)
 myfiles <- myfiles[!grepl("log", myfiles, ignore.case = TRUE)] # remove log files
+myfiles <- myfiles[!grepl("Empty", myfiles, ignore.case = TRUE)] # remove log files
+myfiles <- myfiles[!grepl("unknown", myfiles, ignore.case = TRUE)] # remove log files
 
 
 mdat <- map_df(myfiles, ReadIniButtons)
@@ -67,14 +82,14 @@ head(mdat)
 
 iButtonData <- mdat %>% 
   mutate(Year = as.numeric(Year)) %>% 
-  left_join(dictionary, by = c("Year", "siteID", "iButtonID"))
+  full_join(dictionary, by = c("Year", "siteID", "iButtonID"))
 
 save(iButtonData, file = "iButton2016.RData")
 load(file = "iButton2016.RData")
 
 iButtonData %>% 
-  filter(siteID == "Alrust") %>% 
-  filter(format(Date, "%Y-%m-%d") == "2015-09-20") %>%
+  filter(siteID == "Lavisdalen") %>% 
+  filter(format(Date, "%Y-%m-%d") == "2015-08-20") %>%
   filter(Value > -40, Value < 50) %>%
   ggplot(aes(x = Date, y = Value, color = Block)) +
   geom_line() +
@@ -86,3 +101,33 @@ mdat %>%
   ggplot(aes(x = Date, y = Value)) +
   geom_line() +
   facet_wrap(~ siteID)
+
+
+RemoveDates <- data_frame(siteID = c("Gudmedalen", "Skjellingahaugen", "Rambera", "Veskre"),
+           MinDate = ymd_hms(c("2015-07-13 00:00:00", "2015-09-24 00:00:00", "2015-08-12 00:00:00", "2015-07-30 00:00:00")),
+           MaxDate = ymd_hms(c("2016-07-04 00:00:00", "2016-07-02 00:00:00",  "2016-06-30 00:00:00", "2016-06-27 00:00:00")))
+
+# Only retain certain blocks: VES: 3,4; SKJ: 1:4; GUD: 5; RAM: 4,5
+Loggers <- data_frame(
+  siteID = c("Gudmedalen", rep("Skjellingahaugen", 4), rep("Rambera", 2), rep("Veskre", 2)),
+  Block = as.character(c(5, 1, 2, 3, 4, 4, 5, 3, 4)))
+
+iButtonData %>% 
+  filter(siteID %in% c("Gudmedalen", "Skjellingahaugen", "Rambera", "Veskre")) %>% 
+  filter(Treatment == "C") %>% 
+  # select loggers important for pollination plots
+  inner_join(Loggers) %>% 
+  # Remove dates before logger in the soil
+  left_join(RemoveDates, by = "siteID") %>% 
+  filter(Date >= "2016-04-01 00:00:00", Date <= MaxDate) %>% 
+  mutate(Date_Day = round_date(Date, unit = "day")) %>% 
+  group_by(Date_Day, siteID) %>% 
+  summarise(DailyTemp = mean(Value)) %>% 
+  #ungroup() %>% group_by(siteID) %>% 
+  #mutate(CumTemp = cumsum(DailyTemp)) %>% 
+  ggplot(aes(x = Date_Day, y = DailyTemp, color = siteID)) +
+  geom_line()
+
+
+load(file = "iButton2016.Rdata")
+
