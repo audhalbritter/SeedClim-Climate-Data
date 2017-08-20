@@ -84,8 +84,15 @@ iButtonData <- mdat %>%
   mutate(Year = as.numeric(Year)) %>% 
   full_join(dictionary, by = c("Year", "siteID", "iButtonID"))
 
-save(iButtonData, file = "iButton2016.RData")
-load(file = "iButton2016.RData")
+save(iButtonData, file = "iButton2016-2017.RData")
+load(file = "iButton2016-2017.RData")
+
+# Check start and end date
+iButtonData %>% 
+  group_by(Year, siteID) %>% 
+  summarise(min(Date, na.rm = TRUE), max(Date, na.rm = TRUE)) %>% 
+  arrange(siteID) %>% print(n = Inf)
+
 
 iButtonData %>% 
   filter(siteID == "Lavisdalen") %>% 
