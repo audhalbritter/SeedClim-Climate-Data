@@ -46,7 +46,7 @@ ReadIniButtons <- function(textfile){
   textfile2 <- tibble(dirname(textfile))
   colnames(textfile2) <- "ID"
   textfile2 <- textfile2 %>% 
-    separate(col = ID, into = c("a", "b", "c", "d","e","f","g","h","i", "Year","siteID"), sep = "/")
+    separate(col = ID, into = c("a", "b", "c", "d","e","f","g","h","i", "Year", "siteID"), sep = "/")
   dat$siteID <- textfile2$siteID
   dat$Year <- textfile2$Year
   return(dat)
@@ -56,13 +56,13 @@ ReadIniButtons <- function(textfile){
 
 
 # read in iButtonID dictionary 2016
-dictionary16 <- read_excel(path = "iButtonID_2016-2017.xlsx", sheet = 1, col_names = TRUE)
+dictionary16 <- read_excel(path = "iButtonDictionary.xlsx", sheet = 1, col_names = TRUE)
 
 dictionary16 <- dictionary16 %>% 
   mutate(Block = plyr::mapvalues(Block, c("FCIII", "FCII", "FCI", "FCV", "FCIV", "FCXV", "FCXII", "FCXIII", "FCI ", "FCVI", "FCVIII", "IX", "II", "V", "E2"), c("3", "2", "1", "5", "4", "15", "12", "13", "1","6", "8", "9", "2", "5", "E2")))
 
 # read in iButtonID dictionary 2017
-dictionary17 <- read_excel(path = "iButtonID_2016-2017.xlsx", sheet = 2, col_names = TRUE)
+dictionary17 <- read_excel(path = "iButtonDictionary.xlsx", sheet = 2, col_names = TRUE)
 dictionary17 <- dictionary17 %>% 
   mutate(siteID = plyr::mapvalues(siteID, c("LAV", "GUD", "SKJ", "ULV", "ALR", "FAU", "HOG", "VIK", "RAM", "VES", "OVS", "ARH"), c("Lavisdalen", "Gudmedalen", "Skjellingahaugen", "Ulvhaugen", "Alrust", "Fauske", "Hogsete", "Vikesland", "Rambera", "Veskre", "Ovstedal", "Arhelleren")))
 
@@ -102,17 +102,48 @@ iButtonData %>%
   geom_line() +
   facet_wrap(~ Treatment)
 
-mdat %>% 
+iButtonData %>% 
   filter(!iButtonID %in% c("3E369341.csv", "3E3DF841.csv")) %>% # remove 2 iButtons from Gudmeldalen; these loggers need to be checked!!!
   filter(Value > -40, Value < 50) %>% # crop impossible values
   ggplot(aes(x = Date, y = Value)) +
   geom_line() +
+  facet_wrap(~ siteID) +
+  ggsave(filename = "ibutton_allSites_allYears.jpg")
+
+
+iButtonData %>% 
+  #filter(siteID == "Hogsete") %>%
+  filter(!iButtonID %in% c("3E369341.csv", "3E3DF841.csv")) %>% # remove 2 iButtons from Gudmedalen; these loggers need to be checked!!!
+  filter(format(Date, "%Y-%m-%d") < "2016-10-20") %>% 
+  filter(Treatment != "NA") %>% 
+  ggplot(aes(x = Date, y = Value, colour = siteID)) +
+  geom_line() +
+  facet_wrap(~ Treatment)
+
+
+# having a look at, and removing, ibuttons that are apparently logging until December 2017
+wonkyiButtons <- iButtonData %>% 
+  filter(Date > "2017-09-01 00:07:01") %>% 
+  distinct(iButtonID) %>% 
+  pull(iButtonID)
+
+iButtonData %>%
+  filter(iButtonID %in% wonkyiButtons) %>% 
+  ggplot(aes(x = Date, y = Value)) +
+  geom_line() +
   facet_wrap(~ siteID)
 
+iButtonData <- iButtonData %>% 
+  filter(!iButtonID %in% wonkyiButtons)
+
+# we need to find some way in the code to allow ibutton id to change from removal date to replacement date...
+
+#####################################
+######## PHENOLOGY PLOTTING #########
 
 RemoveDates <- data_frame(siteID = c("Gudmedalen", "Skjellingahaugen", "Rambera", "Veskre"),
-           MinDate = ymd_hms(c("2015-07-13 00:00:00", "2015-09-24 00:00:00", "2015-08-12 00:00:00", "2015-07-30 00:00:00")),
-           MaxDate = ymd_hms(c("2016-07-04 00:00:00", "2016-07-02 00:00:00",  "2016-06-30 00:00:00", "2016-06-27 00:00:00")))
+                          MinDate = ymd_hms(c("2015-07-13 00:00:00", "2015-09-24 00:00:00", "2015-08-12 00:00:00", "2015-07-30 00:00:00")),
+                          MaxDate = ymd_hms(c("2016-07-04 00:00:00", "2016-07-02 00:00:00",  "2016-06-30 00:00:00", "2016-06-27 00:00:00")))
 
 # Only retain certain blocks: VES: 3,4; SKJ: 1:4; GUD: 5; RAM: 4,5
 Loggers <- data_frame(
@@ -137,4 +168,6 @@ iButtonData %>%
 
 
 load(file = "iButton2016.Rdata")
+
+# -- phenology end -- #
 
