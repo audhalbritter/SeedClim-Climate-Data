@@ -32,7 +32,7 @@ plot_climate(start_date = "2008.1.1", end_date = "2017.11.1", log = c("temp1"), 
 
 # plot single site
 temperature %>% 
-  filter(site == "Lav") %>% 
+  filter(site == "Gud") %>% 
   ggplot(aes(x = date, y = value)) +
   geom_line() +
   facet_wrap(~ logger)
