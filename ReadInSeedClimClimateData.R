@@ -1,10 +1,10 @@
 ####################################
 # READ IN SEEDCLIM CLIMATE DATA
 ####################################
-library("tidyverse")
 
 #### IMPORT CLIMATE DATA FOR ALL SITES
 source('~/Dropbox/Bergen/SeedClim Climate/SeedClim-Climate-Data/Functions_ReadInSeedClimClimateData.R', echo=TRUE)
+
 climate <- plyr::ldply(c("Fau", "Alr", "Ulv", "Vik", "Hog", "Lav", "Arh", "Ram", "Gud", "Ovs", "Ves", "Skj"), ImportData)
 head(climate)
 unique(climate$logger)
@@ -28,7 +28,14 @@ table(temperature$logger, year(temperature$date))
 table(temperature$site, year(temperature$date))
 
 # plot logger by site
-plot_climate(start_date = "2008.1.1", end_date = "2010.1.1", log = c("temp200cm"), inc = TRUE, SITE = "Arh")
+plot_climate(start_date = "2008.1.1", end_date = "2017.11.1", log = c("temp1"), inc = TRUE, SITE = "Lav")
+
+# plot single site
+temperature %>% 
+  filter(site == "Lav") %>% 
+  ggplot(aes(x = date, y = value)) +
+  geom_line() +
+  facet_wrap(~ logger)
 
 
 # Find file names
@@ -72,8 +79,8 @@ temperature$flag[temperature$file == "fauske_climate_spring_2016.txt" & temperat
 temperature$flag[temperature$file == "Fauske_temp_Fall2016.txt" & temperature$logger == "temp1"] <- "VarianceProblem"
 temperature$flag[temperature$file == "Fauske_temp_Fall2016.txt" & temperature$logger == "temp2"] <- "VarianceProblem"
 # switch logger temp1 and temp2 always !!!
-temperature$logger[temperature$site == "Fau" & temperature$logger == "temp1"] <- "tempsoil"
-temperature$logger[temperature$site == "Fau" & temperature$logger == "temp2"] <- "tempabove"
+temperature$logger[temperature$site == "Fau" & temperature$logger %in% c("temp1", "thermistor.2")] <- "tempsoil"
+temperature$logger[temperature$site == "Fau" & temperature$logger %in% c("temp2", "thermistor.1")] <- "tempabove"
 
 
 # VIKESLAND:
@@ -152,8 +159,9 @@ temperature$flag[temperature$site == "Lav" & year(temperature$date) == "2013" & 
 temperature$flag[temperature$site == "Lav" & year(temperature$date) == "2013" & temperature$logger == "temp2"] <- "FewData"
 # Remove wrong data points in 2012/2013
 temperature <- temperature %>% 
-  mutate(value = ifelse(logger == "tempabove" & file %in% c("Lavisdalen_met1.txt", "Lavisdalen_met1 (2).txt"), NA, value)) %>% 
-  mutate(value = ifelse(logger == "tempsoil" & file %in% c("Lavisdalen_08062011_25102011.txt", "Lavisdalen-met1-20120913.txt", "Lavisdalen_met1 (2).txt", "Lavisdalen_met1.txt"), NA, value))
+  mutate(value = ifelse(logger == "temp1" & file %in% c("Lavisdalen_met1.txt", "Lavisdalen_met1 (2).txt", "Lavisdalen-met1-20120913.txt"), NA, value)) %>% 
+  mutate(value = ifelse(logger == "temp2" & file %in% c("Lavisdalen-met1-20120913.txt", "Lavisdalen_met1 (2).txt", "Lavisdalen_met1.txt"), NA, value)) %>% 
+  mutate(value = ifelse(logger == "tempsoil" & file %in% c("Lavisdalen_08062011_25102011.txt"), NA, value))
 
 
 # GUDMEDALEN
@@ -173,7 +181,7 @@ temperature$flag[temperature$site == "Skj" & year(temperature$date) == "2012" & 
 temperature$logger[temperature$site == "Skj" & temperature$date > "2015-01-01 00:00" & temperature$date < "2016-10-04 12:00" & temperature$logger == "temp1"] <- "tempsoil"
 temperature$logger[temperature$site == "Skj" & temperature$date > "2015-01-01 00:00" & temperature$date < "2016-10-04 12:00" & temperature$logger == "temp2"] <- "tempabove"
 
-# remove everything begore 1.10.2008, values too high
+# remove everything before 1.10.2008, values too high
 temperature <- temperature %>% 
   filter(date > "2008-10-01 00:00:00")
 
