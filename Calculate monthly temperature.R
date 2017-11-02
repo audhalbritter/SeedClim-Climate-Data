@@ -92,7 +92,7 @@ filler <- expand.grid(
 dailyTemperature <- merge(dailyTemperature, filler, all = TRUE)
 dailyTemperature$site <- factor(dailyTemperature$site, levels=c("Skj", "Gud", "Lav", "Ulv", "Ves", "Ram", "Hog", "Alr", "Ovs", "Arh", "Vik", "Fau"))
 
-save(dailyTemperature, file = "Daily.Temperature_2008-2016.RData")
+save(dailyTemperature, file = "Daily.Temperature_2008-2017.RData")
 
 
 # Rbind gridded and Seedclim data
