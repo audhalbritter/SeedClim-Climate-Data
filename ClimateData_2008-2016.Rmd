@@ -23,20 +23,21 @@ load("Monthly.Temperature_2008-2017.Rdata")
 
 ##  Overview
 
-Climate data from climate logger at 12 the SeedClim / FunCaB sites from the period of 2008 - 2016, hourly values
+Climate data from climate logger at 12 the SeedClim / FunCaB sites from the period of 2008 - oct 2017, hourly values
 
 
 Climate variables are (unit / varible name)
+
  - Hourly air temperature 2m above the gorund (°C, temp200cm)  
  - Hourly air temperature 30cm above the gorund (°C, temp30cm)  
  - Hourly air temperature 0m above the gorund / in the vegetation (°C, tempabove)  
  - Hourly soil temperature 5cm below the gorund (°C, tempsoil)  
- - Hourly soilmoisture (%, soilmoisture). Always 2 loggers per site! Mean not calculated yet.
+ - Hourly soilmoisture (%, soilmoisture). Always 2 loggers per site! Mean not calculated yet
  - Hourly precipitation (mm, precipitation)  
 
 Daily and monthly mean data for each site is available for all temperature loggers:
-Daily.Temperature_2008-2016.RData
-Monthly.Temperature_2008-2016.RData
+- Daily.Temperature_2008-2016.RData
+- Monthly.Temperature_2008-2016.RData
 
 
 ## Data processing
@@ -105,7 +106,12 @@ Air temperature 30cm
 dd <- temperature %>% 
   filter(logger == "temp30cm")
 
-g + ggtitle("Air temperature 30cm")
+g <- ggplot(dd, aes(x = date, y = value, color = site)) +
+  geom_line() +
+  scale_colour_brewer(palette="Paired") +
+  facet_wrap(~ site) + 
+  theme(legend.position="none") + ggtitle("Air temperature 30cm")
+g
 ```
 
 Air temperature 0cm
@@ -114,7 +120,13 @@ Air temperature 0cm
 dd <- temperature %>% 
   filter(logger == "tempabove")
 
-g + ggtitle("Air temperature 0cm")
+g <- ggplot(dd, aes(x = date, y = value, color = site)) +
+  geom_line() +
+  scale_colour_brewer(palette="Paired") +
+  facet_wrap(~ site) + 
+  theme(legend.position="none") + 
+  ggtitle("Air temperature 0cm")
+g
 ```
 
 Soil temperature -5cm
@@ -123,7 +135,13 @@ Soil temperature -5cm
 dd <- temperature %>% 
   filter(logger == "tempsoil")
 
-g + ggtitle("Soil temperature -5cm")
+g <- ggplot(dd, aes(x = date, y = value, color = site)) +
+  geom_line() +
+  scale_colour_brewer(palette="Paired") +
+  facet_wrap(~ site) + 
+  theme(legend.position="none") + 
+  ggtitle("Soil temperature -5cm")
+g
 ```
 
 
