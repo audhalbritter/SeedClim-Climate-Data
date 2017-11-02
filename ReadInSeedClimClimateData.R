@@ -32,7 +32,7 @@ plot_climate(start_date = "2008.1.1", end_date = "2017.11.1", log = c("temp1"), 
 
 # plot single site
 temperature %>% 
-  filter(site == "Gud") %>% 
+  filter(site == "Skj") %>% 
   ggplot(aes(x = date, y = value)) +
   geom_line() +
   facet_wrap(~ logger)
@@ -193,9 +193,17 @@ temperature$logger[temperature$logger == "temp2"] <- "tempsoil"
 temperature <- temperature %>% 
   mutate(site = factor(site, levels = c("Skj", "Gud", "Lav", "Ulv", "Ves", "Ram", "Hog", "Alr", "Ovs", "Arh", "Vik", "Fau")))
 
-#fill missing dates with NA y merging with complete dataset
+# fill missing dates with NA and merging with complete dataset
 full_grid <- expand.grid(logger = unique(temperature$logger), site = unique(temperature$site), date = seq(min(temperature$date), max(temperature$date), by = "hour"))
 
 temperature <- left_join(full_grid, temperature) %>% tbl_df()
 
 save(temperature, file = "Temperature.RData")
+
+# Fix location problem, duplicates
+files_db <- dir(path = paste0("~/Dropbox/seedclim klimadaten/rawdata by Site/"), pattern = "txt", recursive = TRUE, full.names = TRUE)
+files_p <- dir(path = paste0("/Volumes/felles/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site/"), pattern = "txt", recursive = TRUE, full.names = TRUE)
+
+setdiff(basename(files_p), basename(files_db))
+  
+  
