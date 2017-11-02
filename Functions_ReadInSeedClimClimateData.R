@@ -131,7 +131,7 @@ ReadInBodyUTL <- function(textfile, SITE){
 
 #### Read in ITAS or UTL ####
 ReadData <- function(textfile, site){
-  # print(textfile)
+  print(textfile)
   first <- substring(readLines(textfile, n = 1), 1, 5) # read first line to check which logger it is
   if(first == "Label"){ #check format based on first line
     dat <- ReadInBodyITAS(textfile)
