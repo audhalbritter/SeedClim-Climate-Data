@@ -96,7 +96,7 @@ iButtonData <- mdat %>%
   full_join(dictionary, by = c("Year", "siteID", "iButtonID"))
 
 save(iButtonData, file = "iButton2016-2017.RData")
-load(file = "iButton2016-2017.RData")
+load(file = "/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_groups/SeedClim-Climate-Data/iButton2016-2017.RData")
 
 # Check start and end date
 iButtonData %>% 
@@ -119,32 +119,77 @@ iButtonData %>%
 
 iButtonData <- iButtonData %>% 
   filter(!iButtonID %in% wonkyiButtons) %>% 
-  #filter(Value > -40, Value < 50) %>% # crop impossible values, but look into a smoother option
+  filter(Value > -40, Value < 50) %>% # crop impossible values, but look into a smoother option
   filter(!iButtonID %in% c("3E369341.csv", "3E3DF841.csv")) %>% # remove 2 iButtons from Gudmeldalen; these loggers need to be checked!!!
   filter(!(Date < ReplacementDate & Year == 2016)) %>%  # remove values in 2015 before ibuttons have been placed
   #filter(!(Date < ReplacementDate & Year == 2017)) %>% 
   filter(!(Date > RemovalDate & Year == 2016)) %>% 
-  filter(!(Year == 2017))
+  filter(!(Year == 2017))%>% 
   #filter(!(Date > RemovalDate & Year == 2017))
   #filter(!is.na(Treatment))
+  mutate(Temperature_level = if_else(siteID %in% c("Lavisdalen", "Gudmedalen", "Skjellingahaugen", "Ulvhaugen"), "6.5",
+                                     if_else(siteID %in% c("Alrust", "Hogsete", "Rambera", "Veskre"), "8.5", "10.5"))) %>% 
+  mutate(Precipitation_level = if_else(siteID %in% c("Alrust", "Fauske", "Ulvhaugen"), "0.6",
+                                     if_else(siteID %in% c("Lavisdalen","Hogsete", "Vikesland"), "1.2",
+                                             ifelse(siteID %in% c("Rambera", "Gudmedalen", "Arhelleren"), "2.0", "2.7")))) %>% 
+  mutate(Precipitation_level = as.numeric(Precipitation_level), Temperature_level = as.numeric(Temperature_level))
 
-ibuttonID2017 <- iButtonData %>% 
-  filter(Year == 2017) %>% 
-  distinct(iButtonID)
 
-ibutton2017 <- iButtonData %>% 
-  filter(Year == 2017)
+iButtonData %>% filter(format(Date, "%Y-%m") == "2016-06") %>%
+  filter(Treatment %in% c("C", "2m_site")) %>%
+  mutate(hour = hour(Date)) %>% 
+  group_by(Treatment, iButtonID, hour, Temperature_level, Precipitation_level) %>%
+  summarise(mean = mean(Value)) %>%
+  ggplot(aes(x = hour, y = mean, colour = Treatment)) +
+  geom_smooth(se = TRUE) +
+  facet_grid(Precipitation_level ~ Temperature_level) +
+  scale_color_manual(values = cbPalette) +
+  theme_classic()
+
+
+# read in soil moisture data
+
+soilMoisture <- read_excel("/Volumes/fja062/PhD/Data/Soilmoisture_1516.xlsx")
+
+soilMoisture
+
+soilMoisture[, 8 : 11] <- plyr::colwise(as.numeric)(soilMoisture[, 8 : 11])
+
+x <- soilMoisture %>% 
+  filter(comments == "fewer readings"|is.na(comments)) %>% 
+  filter(!is.na(treatment)) %>% 
+  mutate(TurfID = paste0(site, block, treatment)) %>% 
+  group_by(date, TurfID) %>% 
+  mutate(n = n()) %>% 
+  filter(n > 1)
+  mutate(SM = mean(c(M1, M2, M3, M4), na.rm = TRUE))
+
+
 
 # need to check ibuttons that don't seem to be logging regularly. happens in several sites.
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#1C9099", "#A6BDDB", "#ECE2F0", "orange3")
 
 
 iButtonData %>% 
-  filter(siteID == "Lavisdalen") %>% 
-  filter(format(Date, "%Y-%m-%d") == "2015-08-20") %>%
-  ggplot(aes(x = Date, y = Value, color = Block)) +
-  geom_line() +
-  facet_wrap(~ Treatment)
+  filter(!is.na(Treatment)) %>% 
+  filter(format(Date, "%Y-%m-%d") == "2016-05-23") %>%
+  ggplot(aes(x = Date, y = Value, color = Temperature_level)) +
+  geom_point() +
+  facet_wrap(~ Treatment) +
+  theme_bw() +
+  scale_color_manual(values = cbPalette[c(2, 3, 4, 7)]) 
+  ggsave(filename = "ibutton_dailyAmplitude_christmas_2015.jpg", path = "/Users/fja062/Documents")
+
+iButtonData %>% 
+  filter(!is.na(Treatment)) %>% 
+  filter(format(Date, "%Y-%m-%d") == "2016-06-23") %>%
+  ggplot(aes(x = Date, y = Value, color = Treatment)) +
+  geom_smooth(se = FALSE) +
+  facet_wrap(~ Temperature_level) +
+  theme_bw() +
+  scale_color_manual(values = cbPalette) +
+  ggsave(filename = "ibutton_dailyAmplitude_jun_2016.jpg")
+
 
 iButtonData %>% 
   ggplot(aes(x = Date, y = Value, colour = Treatment)) +
@@ -162,12 +207,14 @@ minmax <- iButtonData %>%
   gather(range, temperature, min, max)
 
 minmax %>% 
-  filter(siteID == "Fauske") %>% 
-  ggplot(aes(x = week, y = temperature, colour = range)) +
-  geom_line() +
+  filter(!is.na(Treatment)) %>% 
+  filter(Temperature_level == "6.5") %>% 
+  ggplot(aes(x = Date, y = temperature, colour = range)) +
+  geom_point() +
   facet_wrap(~ Treatment) +
-  scale_color_manual(values = cbPalette)
-  ggsave(filename = "ibutton_minTemp_2016.jpg", path = "/Users/fja062/Documents")
+  scale_color_manual(values = cbPalette) +
+  theme_bw() +
+  ggsave(filename = "ibutton_alpine_TempRange_2016.jpg", path = "/Users/fja062/Documents")
 
 
 ibutton2017 %>% 
@@ -176,6 +223,97 @@ ibutton2017 %>%
   filter(Date > "2016-06-20") %>% 
   ggplot(aes(x = Date, y = Value)) +
   geom_line()
+
+
+load("Temperature.RData")
+
+dict_Site <- read.table(header = TRUE, stringsAsFactors = FALSE, text = 
+                          "old new
+                        Arh Arhelleren
+                        Ovs Ovstedal
+                        Ves Veskre
+                        Skj Skjellingahaugen
+                        Lav Lavisdalen
+                        Gud Gudmedalen
+                        Ulv Ulvhaugen
+                        Vik Vikesland
+                        Hog Hogsete
+                        Alr Alrust
+                        Fau Fauske
+                        Ram Rambera")
+
+temperature <- temperature %>% 
+  filter(!is.na(value)) %>% 
+  filter(date > "2015-07-01") %>% 
+  filter(date < "2016-10-01") %>% 
+  mutate(site = plyr::mapvalues(site, from = dict_Site$old, to = dict_Site$new)) %>%
+  filter(is.na(flag)) %>% 
+  select(siteID = site, Date = date, Value = value) %>% 
+  mutate(Treatment = "2m_site")
+
+
+iButtonData <- iButtonData %>% 
+  full_join(temperature, by = c("siteID", "Date", "Treatment", "Value"))
+
+
+
+###### bayesian analysis #####
+sink("/Users/fja062/Documents/SeedClim-Climate-Data/ibuttonModel.txt")
+
+cat(
+  "model{
+#likelihood
+  for(datIter in 1:nData){
+  obs[datIter] ~ dnorm(mu[datIter], tau)
+  mu[datIter] <- intercept + treatment[dataIter] + time[dataIter] + temp[datIter] + precip[dataIter]
+  }
+
+
+
+#random effects
+  for(site in 1:siteID){
+    for(block in 1:blockID){
+    eps[site[block]] ~ dnorm(0,tau.block)
+    eps[site] ~ dnorm(0,tau.site)
+    }
+  }
+
+
+#priors
+  tau.block
+  tau.site
+  tau.obs
+  sigma.block
+  sigma.site
+  sigma.obs
+  treatment
+  time
+  temp
+
+
+
+}
+  "
+  
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
