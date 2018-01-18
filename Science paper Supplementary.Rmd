@@ -1,5 +1,5 @@
 ---
-title: "Science Paper Supplementary Material"
+title: "18-01-18_Science Paper Supplementary Material"
 author: "Aud Halbritter"
 date: "27 6 2017"
 output: word_document
@@ -21,7 +21,7 @@ load("temperaturedata.Rdata")
 load("monthlyTemperaturedata.RData")
 load("monthlyClimate2.Rdata")
 
-Longterm <- data_frame(T_level = as.factor(c(rep("boreal", 4), rep("subalpine", 4), rep("alpine", 4))),
+Longterm <- data_frame(T_level = as.factor(c(rep("Boreal", 4), rep("Subalpine", 4), rep("Alpine", 4))),
                        P_level = as.factor(c(rep(c(1,2,3,4),3))),
                        P_mean = c(600, 1161, 2044, 2923, 789, 1356, 1848, 3029, 596, 1321, 1925, 2725),
                        T_mean = c(10.3, 10.55, 10.6, 10.78, 9.14, 9.17, 8.77, 8.67, 6.17, 6.45, 5.87, 6.58),
@@ -35,23 +35,24 @@ Longterm <- data_frame(T_level = as.factor(c(rep("boreal", 4), rep("subalpine", 
 The climate grid (Figure 1 in main text) was set up on the basis of downscaled climate data (data from met.no). In this supplement we explore patterns weather data measured locally at the SeedClim sites to confirm the climate grid with groud data.
 
 # Temperature
-Monthly averages of local temperature measurements differ consistently among boreal, sub-alpine and alpine sites during summer, for air (Figure S1.1) and ground temperatures (not shown). The differences are less clear during spring, autumn and winter.
+Monthly averages of local temperature measurements differ consistently among boreal, subalpine and alpine sites during summer, for air (Figure S1.1) and ground temperatures (not shown). The differences are less clear during spring, autumn and winter.
 
 ```{r, echo=FALSE} 
 monthlyTemperaturedata %>% 
   filter(logger == "temp200cm") %>% 
-  mutate(T_level = factor(T_level, levels = c("boreal","subalpine","alpine"))) %>% 
+  filter(!is.na(T_level)) %>% 
+  mutate(T_level = factor(T_level, levels = c("Boreal","Subalpine","Alpine"))) %>% 
   group_by(T_level, date) %>% 
   summarise(mean = mean(value, na.rm = TRUE)) %>% 
   ggplot(aes(x = date, y = mean, color = T_level)) +
-  geom_line(size = 0.6) +
+  geom_line(size = 0.9) +
   labs(x = "", y = "Monthly air temperature in °C") +
   scale_color_manual(name = "Temperature level", values = c("darkred", "red", "orange")) +
-  theme_minimal()
+  theme_minimal(base_size = 15)
 
 ```
 
-Figure S1.1. Time series of monthly average temperature for boreal (darlred), sub-alpine (red) and alpine (orange) sites measured at 2m above ground.
+Figure S1.1. Time series of monthly average temperature for boreal (darlred), subalpine (red) and alpine (orange) sites measured at 2m above ground.
 
 
 # Precipitation
@@ -62,14 +63,15 @@ monthlyClimate2 %>%
   filter(logger == "Precipitation") %>% 
   group_by(P_level, date) %>% 
   summarise(mean = mean(value, na.rm = TRUE)) %>% 
-  ggplot(aes(x = date, y = mean, color = P_level)) +
-  geom_line(size = 0.6) +
+  ggplot(aes(x = date, y = mean, color = P_level, linetype = P_level)) +
+  geom_line(size = 0.9) +
   labs(x = "", y = "Monthly precipitation in mm") +
-  scale_color_manual(name = "Precipitation level", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue")) +
-  theme_minimal()
+  scale_color_manual(name = "Precipitation level", values = c("#DFEBF7", "#9DC3E6", "#2E75B6", "#213964")) +
+  scale_linetype_manual(name = "Precipitation level", values = c(3, 2, 5, 1)) + #"dotted", "dashed", "long-dashed", "solid"
+  theme_minimal(base_size = 20)
 ```
 
-Figure S1.2. Time series of sum of monthly precipitation averaged across sites for each precipitation level according to increasing precipitation levels (500mm, 1200mm, 2000mm, 2700mm) from light to dark blue. 
+Figure S1.2. Time series of sum of monthly precipitation averaged across sites for each precipitation level according to increasing precipitation levels: 1 = dotted, 2 = dashed, 3 = long-dashed and 4 = solid line (500mm, 1200mm, 2000mm, 2700mm) from light to dark blue. 
 
 
 # Climate grid
@@ -95,20 +97,21 @@ monthlyClimate2 %>%
   bind_rows(Longterm) %>%
   ungroup() %>% 
   mutate(P_level = factor(P_level, levels = c(1,2,3,4))) %>% 
-  mutate(T_level = factor(T_level, levels = c("boreal", "subalpine", "alpine"))) %>% 
+  mutate(T_level = factor(T_level, levels = c("Boreal", "Subalpine", "Alpine"))) %>% 
   ggplot(aes(x = P_mean, xmin = P_mean - P_se, xmax = P_mean + P_se, y = T_mean, ymin = T_mean -T_se, ymax = T_mean + T_se, color = P_level, shape = T_level, fill = factor(ifelse(logger == "7 year gridded", P_level, logger)))) +
   geom_errorbar() +
   geom_errorbarh() +
   geom_point(aes(size = logger)) +
   labs(x = "Annual precipitation in mm", y = "Tetraterm temperature in °C") +
-  scale_color_manual(name = "Precipitation level", values = c("lightsteelblue1", "skyblue1", "steelblue3", "midnightblue")) +
+  scale_color_manual(name = "Precipitation level", values = c("#DFEBF7", "#9DC3E6", "#2E75B6", "#213964")) +
   scale_shape_manual(name = "Temperature level", values = c(25, 21, 24)) +
-  scale_fill_manual(name = "Data", values = c("lightsteelblue1", "skyblue1", "steelblue3", "white", "midnightblue")) +
+  scale_fill_manual(name = "Data", values = c("#DFEBF7", "#9DC3E6", "#2E75B6", "white", "#213964")) +
   scale_size_manual(name = "Source", values = c(3, 3.01))+
   guides(fill = "none", size = guide_legend(override.aes = list(shape = c(1, 16)))) +
-  theme_minimal()
+  theme_minimal(base_size = 20)
+
 ```
 
-Figure S1.3. Grid of precipitation and tetraterm temperatures with means of observations across years ± SE (vertical and horizontal error bars). Colors from light to dark blue are according to increasing precipitation levels (500mm, 1200mm, 2000mm, 2700mm). The shape of the symbols represent the temperature levels (boreal: reverse triangle, sub-alpine: circle, alpine: triangle). Closed symbols represent the gridded data over the 7 years of the experiment. Open symbols show the 30 year normal climate data.
+Figure S1.3. Grid of precipitation and tetraterm temperatures with means of observations across years ± SE (vertical and horizontal error bars). Colors from light to dark blue are according to increasing precipitation levels 1 = dotted, 2 = dashed, 3 = long-dashed and 4 = solid line. The shape of the symbols represent the temperature levels (boreal: reverse triangle, subalpine: circle, alpine: triangle). Closed symbols represent the gridded data over the 7 years of the experiment. Open symbols show the 30 year normal climate data.
 
 
