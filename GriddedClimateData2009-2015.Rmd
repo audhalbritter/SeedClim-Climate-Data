@@ -1,5 +1,5 @@
 ---
-title: "GriddedClimateData2009-2015"
+title: "GriddedClimateData2009-2017"
 author: "Aud Halbritter"
 date: "18.01.2017"
 output: html_document
@@ -16,13 +16,13 @@ library("dplyr")
 library("tidyr")
 
 #load data
-load("GriddedDailyClimateData2009-2016.Rdata")
+load("GriddedDailyClimateData2009-2017.Rdata")
 ```
 
 ##  Overview
 
 Gridded data from met.no (from Ole Einar Tveito, 25.10.2016 and 17.01.2017)
-Climate data are for 12 the SeedClim / FunCaB sites from the period of 2009 - 2016, daily values
+Climate data are for 12 the SeedClim / FunCaB sites from the period of 2009 - 2017, daily values
 
 
 Climate variables are  
@@ -33,14 +33,14 @@ Climate variables are
  - Precipitation (mm, Precipitation)
 
 Monthly and annual mean data for each site is available:
-GriddedMonthly_AnnualClimate2009-2016.RData
+GriddedMonthly_AnnualClimate2009-2017.RData
 
 
 ## Data processing
 
 The data was provided in dat files.
 
-The raw data is stored on P:/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClimClimateData/met-data/GriddedClimateData2009-2016
+The raw data is stored on P:/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClimClimateData/met-data/GriddedClimateData2009-2017
 
 Code for reading the data from the dat files is in 'ReadInGriddedData.R'. These are archived versions of the code; the working version of the code in the SeedClim-Climate-Data github repository.
 
@@ -50,8 +50,8 @@ Site names were changed from a ID that was used to extranct the data to the 3 le
 ## Importing the data
 
 The data are provided in .Rdata files. These can be read into R with the `load` command, and ensures that dates etc are correct. The data are in a tidy format: one row - one observation. This code will load the data.
-E.g.: load("GriddedDailyClimateData2009-2016.RData", verbose=TRUE)
-load("GriddedMonthly_AnnualClimate2009-2016.RData", verbose=TRUE)
+E.g.: load("GriddedDailyClimateData2009-2017.RData", verbose=TRUE)
+load("GriddedMonthly_AnnualClimate2009-2017.RData", verbose=TRUE)
 
 ```{r loadStuff, eval = FALSE} 
 ```
