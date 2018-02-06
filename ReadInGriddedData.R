@@ -1,4 +1,4 @@
-### READ IN GRIDDED CLIMATE DATA 2009 - 2015
+### READ IN GRIDDED CLIMATE DATA 2009 - 2017
 
 # Explanation for variables
 # TAM er temperatur (døgnmiddel)
@@ -25,7 +25,7 @@ ReadInFiles <- function(textfile){
 }
 
 # Connect to data on P drive
-myfiles <- list.files(path="/Volumes/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClimClimateData/met-data/GriddedClimateData2009-2016", pattern='\\.dat$', recursive = TRUE, full.names = TRUE)
+myfiles <- list.files(path="/Volumes/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClimClimateData/met-data/GriddedClimateData2009-2017", pattern='\\.dat$', recursive = TRUE, full.names = TRUE)
 
 # make a list of textfiles
 gridclimate <- plyr::ldply(myfiles, ReadInFiles)
@@ -39,7 +39,7 @@ climate <- gridclimate %>%
   mutate(Temperature = as.numeric(Temperature), RelAirMoisture = as.numeric(RelAirMoisture), Wind = as.numeric(Wind), CloudCover = as.numeric(CloudCover), Precipitation = as.numeric(Precipitation))
 
 # Change directory
-save(climate, file = "GriddedDailyClimateData2009-2016.RData")
+save(climate, file = "GriddedDailyClimateData2009-2017.RData")
 
 
 # Calculate Monthly Mean
@@ -58,7 +58,7 @@ annualClimate <- monthlyClimate %>%
   summarise(annualMean = mean(value)) %>% 
   spread(key = Logger, value = annualMean)
   
-save(monthlyClimate, annualClimate, file = paste0("GriddedMonth_AnnualClimate2009-2016", ".Rdata"))
+save(monthlyClimate, annualClimate, file = paste0("GriddedMonth_AnnualClimate2009-2017", ".Rdata"))
 #load(file = "GriddedMonth_AnnualClimate2009-2016.RData", verbose = TRUE)
 
 
