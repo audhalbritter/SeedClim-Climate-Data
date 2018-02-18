@@ -1,6 +1,6 @@
 ---
-title: "18-01-18_Science Paper Supplementary Material"
-author: "Aud Halbritter"
+title: "Science Paper Supplementary Material"
+author: "Vandvik et al."
 date: "27 6 2017"
 output: word_document
 
@@ -15,13 +15,14 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache = TRU
 library("lubridate")
 library("tidyverse")
 library("ggplot2")
+library("gridExtra")
 
 #load data
 load("temperaturedata.Rdata")
 load("monthlyTemperaturedata.RData")
 load("monthlyClimate2.Rdata")
 
-Longterm <- data_frame(T_level = as.factor(c(rep("Boreal", 4), rep("Subalpine", 4), rep("Alpine", 4))),
+Longterm <- data_frame(T_level = as.factor(c(rep("Boreal", 4), rep("Sub-alpine", 4), rep("Alpine", 4))),
                        P_level = as.factor(c(rep(c(1,2,3,4),3))),
                        P_mean = c(600, 1161, 2044, 2923, 789, 1356, 1848, 3029, 596, 1321, 1925, 2725),
                        T_mean = c(10.3, 10.55, 10.6, 10.78, 9.14, 9.17, 8.77, 8.67, 6.17, 6.45, 5.87, 6.58),
@@ -32,50 +33,108 @@ Longterm <- data_frame(T_level = as.factor(c(rep("Boreal", 4), rep("Subalpine", 
 
 
 ##  Climate data
-The climate grid (Figure 1 in main text) was set up on the basis of downscaled climate data (data from met.no). In this supplement we explore patterns weather data measured locally at the SeedClim sites to confirm the climate grid with groud data.
+The climate grid (Figure 1 in main text) was set up on the basis of downscaled climate data (data from met.no). In this supplement we explore weather data patterns measured locally at the SeedClim sites to confirm the climate grid with groud data.
 
 # Temperature
-Monthly averages of local temperature measurements differ consistently among boreal, subalpine and alpine sites during summer, for air (Figure S1.1) and ground temperatures (not shown). The differences are less clear during spring, autumn and winter.
+Time series of monthly average temperature for boreal (dark red), sub-alpine (red) and alpine (orange) sites measured at 2m and 0cm above ground and -5cm below ground confirm that there are systematic differences between the sites in temperature (left side), and especially during the four warmest months (right side), over the six years for which we have logged climate data:
+
 
 ```{r, echo=FALSE} 
-monthlyTemperaturedata %>% 
-  filter(logger == "temp200cm") %>% 
+FigS1A_MonthlyAirTemp <- monthlyTemperaturedata %>% 
+  filter(logger %in% c("temp200cm", "tempabove", "tempsoil")) %>%
   filter(!is.na(T_level)) %>% 
-  mutate(T_level = factor(T_level, levels = c("Boreal","Subalpine","Alpine"))) %>% 
-  group_by(T_level, date) %>% 
+  mutate(T_level = factor(T_level, levels = c("Boreal","Sub-alpine","Alpine"))) %>% 
+  mutate(logger = plyr::mapvalues(logger, c("temp200cm", "tempabove", "tempsoil"), c("Air temperature 2m", "Ground temperature 0cm", "Soil temperature -5cm"))) %>% 
+  group_by(T_level, date, logger) %>% 
   summarise(mean = mean(value, na.rm = TRUE)) %>% 
   ggplot(aes(x = date, y = mean, color = T_level)) +
   geom_line(size = 0.9) +
-  labs(x = "", y = "Monthly air temperature in °C") +
-  scale_color_manual(name = "Temperature level", values = c("darkred", "red", "orange")) +
+  labs(x = "", y = "Average monthly temperature in °C") +
+  scale_color_manual(name = "Temperature level", values = c("darkred", "red", "orange"), guide = FALSE) +
+  facet_wrap(~ logger, nrow = 3) +
   theme_minimal(base_size = 15)
+
+# Boxplots
+FigS1B_MonthlyAirTemp <- monthlyTemperaturedata %>% 
+  filter(logger %in% c("temp200cm", "tempabove", "tempsoil")) %>%
+  filter(month(date) %in% 6:9) %>% 
+  filter(!is.na(T_level)) %>% 
+  mutate(T_level = factor(T_level, levels = c("Boreal","Sub-alpine","Alpine"))) %>% 
+  mutate(logger = plyr::mapvalues(logger, c("temp200cm", "tempabove", "tempsoil"), c("Air temperature 2m", "Ground temperature 0cm", "Soil temperature -5cm"))) %>% 
+  ggplot(aes(x = T_level, y = value, fill = T_level)) +
+  geom_boxplot() +
+  labs(x = "", y = "Average summer temperature in °C") +
+  scale_fill_manual(name = "Temperature level", values = c("darkred", "red", "orange")) +
+  facet_wrap(~ logger, nrow = 3) +
+  theme_minimal(base_size = 15) +
+  theme(legend.position="bottom")
+
+
+#extract legend
+#https://github.com/hadley/ggplot2/wiki/Share-a-legend-between-two-ggplot2-graphs
+g_legend <- function(a.gplot){
+  tmp <- ggplot_gtable(ggplot_build(a.gplot))
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+  legend <- tmp$grobs[[leg]]
+  return(legend)}
+
+mylegend <- g_legend(FigS1B_MonthlyAirTemp)
+
+p3 <- grid.arrange(arrangeGrob(FigS1A_MonthlyAirTemp,
+                               FigS1B_MonthlyAirTemp + theme(legend.position="none"),
+                               nrow=1), mylegend, nrow=2,heights=c(10, 1))
 
 ```
 
-Figure S1.1. Time series of monthly average temperature for boreal (darlred), subalpine (red) and alpine (orange) sites measured at 2m above ground.
+The differences are less clear during winter for ground and soil measurements, which is partly due to snow cover. The temperature at the ground and soil level is close to zero and can fall below zero when snow cover is lacking.
 
 
 # Precipitation
-The precipitation data are much noisier than the temperature data (more missing values and outliers), due to logger failure and also because precipitation partly falls as snow. Here the annual gridded data for 1960-90 (www.met.no) is used.
+The precipitation data are much noisier than the temperature data (more missing values and outliers), due to logger failure and also because precipitation falls as snow for a large part of the year. Time series of sum of monthly precipitation for the 5 years of the experiment (www.met.no), averaged across sites for each precipitation level according to increasing precipitation levels (1 = dotted, 2 = dashed, 3 = long-dashed and 4 = solid line from light to dark blue) confirm systematic differences between the sites in precipitation (left side). The same trend across precipitaiton level can be seen for the sum of annual precipitation across the 5 years of the experiment (right side): 
 
 ```{r, echo=FALSE} 
-monthlyClimate2 %>% 
+FigS2A_MonthlyGriddedPrecip <- monthlyClimate2 %>% 
   filter(logger == "Precipitation") %>% 
   group_by(P_level, date) %>% 
   summarise(mean = mean(value, na.rm = TRUE)) %>% 
   ggplot(aes(x = date, y = mean, color = P_level, linetype = P_level)) +
   geom_line(size = 0.9) +
-  labs(x = "", y = "Monthly precipitation in mm") +
-  scale_color_manual(name = "Precipitation level", values = c("#DFEBF7", "#9DC3E6", "#2E75B6", "#213964")) +
-  scale_linetype_manual(name = "Precipitation level", values = c(3, 2, 5, 1)) + #"dotted", "dashed", "long-dashed", "solid"
-  theme_minimal(base_size = 20)
+  labs(x = "", y = "Average monthly precipitation in mm") +
+  scale_color_manual(name = "Precipitation level", values = c("#DFEBF7", "#9DC3E6", "#2E75B6", "#213964"), guide = FALSE) +
+  scale_linetype_manual(name = "Precipitation level", values = c(3, 2, 5, 1), guide = FALSE) + #"dotted", "dashed", "long-dashed", "solid"
+  theme_minimal(base_size = 15)
+
+
+# Boxplots
+FigS2B_MonthlyGriddedPrecip <- monthlyClimate2 %>% 
+  filter(logger == "Temperature" & month(date) %in% 6:9 | logger == "Precipitation") %>% 
+  filter(year(date) != 2016) %>% 
+  group_by(logger, T_level, P_level, year(date)) %>% 
+  summarise(n = n(), mean = mean(value, na.rm = TRUE), sum = sum(value, na.rm = TRUE)) %>% 
+  mutate(mean = ifelse(logger == "Precipitation", sum, mean)) %>% 
+  #group_by(logger, P_level) %>% 
+  #summarise(N = n(), Mean = mean(mean), SE = sd(mean, na.rm = TRUE) / sqrt(N)) %>% 
+  filter(logger == "Precipitation") %>% 
+  ggplot(aes(x = P_level, y = sum, fill = P_level)) +
+  geom_boxplot() +
+  labs(x = "", y = "Average annual precipitation in mm") +
+  scale_fill_manual(name = "Precipitation level", values = c("#DFEBF7", "#9DC3E6", "#2E75B6", "#213964")) +
+  theme_minimal(base_size = 15) +
+  theme(legend.position="bottom")
+
+mylegend <- g_legend(FigS2B_MonthlyGriddedPrecip)
+
+p4 <- grid.arrange(arrangeGrob(FigS2A_MonthlyGriddedPrecip,
+                               FigS2B_MonthlyGriddedPrecip + theme(legend.position="none"),
+                               nrow=1), mylegend, nrow=2,heights=c(10, 1))
 ```
 
-Figure S1.2. Time series of sum of monthly precipitation averaged across sites for each precipitation level according to increasing precipitation levels: 1 = dotted, 2 = dashed, 3 = long-dashed and 4 = solid line (500mm, 1200mm, 2000mm, 2700mm) from light to dark blue. 
+The variation in annual precipitation increases towards the wetter end of the grid.
+
 
 
 # Climate grid
-The grid was set up with annual precipitaiton and tetraterm temperatures, i.e. averages of the months May, June, July, August from gridded data for the period of the experiment (7 years). Also shown are the 30 year normal temperature for the period of 1960-90 (www.met.no). This data confirm the grid.
+Mean of observation across years for precipitation and tetraterm temperatures (i.e. averages of the months June-September) ± SE (vertical and horizontal error bars) from gridded data for the period of the experiment (5 years, closed symbols) and 30 year normal temperature for the period of 1960-90 (www.met.no, open symbols) confirm the climate grid of the experiment with increasing tetraterm temperature from alpine to boreal sites and increasing precipitation from dry to the wet sites:
 
 ```{r, echo=FALSE}
 
@@ -93,12 +152,12 @@ monthlyClimate2 %>%
   separate(col = Precipitation, into = c("P_mean", "P_se"), sep = "_", convert = TRUE) %>% 
   separate(col = Temperature, into = c("T_mean", "T_se"), sep = "_", convert = TRUE) %>%
   select(-N) %>% 
-  mutate(logger = "7 year gridded") %>% 
+  mutate(logger = "5 year gridded") %>% 
   bind_rows(Longterm) %>%
   ungroup() %>% 
   mutate(P_level = factor(P_level, levels = c(1,2,3,4))) %>% 
-  mutate(T_level = factor(T_level, levels = c("Boreal", "Subalpine", "Alpine"))) %>% 
-  ggplot(aes(x = P_mean, xmin = P_mean - P_se, xmax = P_mean + P_se, y = T_mean, ymin = T_mean -T_se, ymax = T_mean + T_se, color = P_level, shape = T_level, fill = factor(ifelse(logger == "7 year gridded", P_level, logger)))) +
+  mutate(T_level = factor(T_level, levels = c("Boreal", "Sub-alpine", "Alpine"))) %>% 
+  ggplot(aes(x = P_mean, xmin = P_mean - P_se, xmax = P_mean + P_se, y = T_mean, ymin = T_mean -T_se, ymax = T_mean + T_se, color = P_level, shape = T_level, fill = factor(ifelse(logger == "5 year gridded", P_level, logger)))) +
   geom_errorbar() +
   geom_errorbarh() +
   geom_point(aes(size = logger)) +
@@ -108,10 +167,12 @@ monthlyClimate2 %>%
   scale_fill_manual(name = "Data", values = c("#DFEBF7", "#9DC3E6", "#2E75B6", "white", "#213964")) +
   scale_size_manual(name = "Source", values = c(3, 3.01))+
   guides(fill = "none", size = guide_legend(override.aes = list(shape = c(1, 16)))) +
-  theme_minimal(base_size = 20)
+  theme_minimal(base_size = 10)
 
 ```
 
-Figure S1.3. Grid of precipitation and tetraterm temperatures with means of observations across years ± SE (vertical and horizontal error bars). Colors from light to dark blue are according to increasing precipitation levels 1 = dotted, 2 = dashed, 3 = long-dashed and 4 = solid line. The shape of the symbols represent the temperature levels (boreal: reverse triangle, subalpine: circle, alpine: triangle). Closed symbols represent the gridded data over the 7 years of the experiment. Open symbols show the 30 year normal climate data.
+Colors from light to dark blue are according to increasing precipitation levels 1 = dotted, 2 = dashed, 3 = long-dashed and 4 = solid line. The shape of the symbols represent the temperature levels (boreal: reverse triangle, subalpine: circle, alpine: triangle).
+The annual precipitation and tetraterm temperature show that the climate has been both warmer and wetter for the 5 year period of the experiment (closed symbols).
+
 
 
