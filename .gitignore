@@ -48,6 +48,7 @@ vignettes/*.pdf
 *.html
 *.pdf
 *.jpeg
+*.jpg
 .my.cnf
 
 # RDataTmp1
