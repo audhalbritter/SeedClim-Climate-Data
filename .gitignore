@@ -36,6 +36,7 @@ vignettes/*.pdf
 *.sqlite
 *.dat
 *.docx
+*.DS_Store
 
 #rasters & shapefiles
 *.bil
