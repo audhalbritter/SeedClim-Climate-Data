@@ -3,14 +3,6 @@
 #          FUNCTIONS
 ####################################
 
-### LIBRARIES
-library("stringi")
-library("lubridate")
-library("reshape2")
-library("tidyr")
-library("dplyr")
-library("ggplot2")
-
 #### IMPORT DATA ####
 
 #### NAME CHECK FUNCTION ####
@@ -146,15 +138,7 @@ ReadData <- function(textfile, site){
 }
 
 
-#### IMPORT DATA PER SITE ####
-ImportData <- function(site){
-  # Define directory (recursive = true reads subdirectories)
-  myfiles <- dir(path = paste0("~/Dropbox/seedclim klimadaten/rawdata by Site/", site), pattern = "txt", recursive = TRUE, full.names = TRUE)
-  
-  # make a list of textfiles
-  mdat <- plyr::ldply(as.list(myfiles), ReadData, site = site)
-  mdat
-}
+
 
 
 
