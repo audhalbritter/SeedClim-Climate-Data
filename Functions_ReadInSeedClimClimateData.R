@@ -6,98 +6,120 @@
 #### IMPORT DATA ####
 
 #### NAME CHECK FUNCTION ####
-NameCheck <- function(site, textfile){
-  site <- substr(site, 1,3)
-  site <- gsub('(^)([[:alpha:]])','\\1\\U\\2\\', site, perl = TRUE)
-  if(site %in% c("Aal", "Ålr", "Ål")||grepl(".lr", site)) {
-    site <- "Alr"
-  }
-  if(site %in% c("Arn")) {site <- "Arh"}
-  if(grepl("H.g", site)) {site <- "Hog"}
-  if(grepl("L.v", site)) {site <- "Lav"}
-  if(grepl(".vs", site)) {site <- "Ovs"}
-  if(site %in% c("Ule")) {site <- "Ulv"}
-    #check
-  if(!site %in% c("Fau", "Alr", "Ulv", "Vik", "Hog", "Lav", "Arh", "Ram", "Gud", "Ovs", "Ves", "Skj"))stop(paste("site is ", site, "from", textfile))
-  site
+NameCheck <- function(textfile){
+  textfile <- iconv(textfile, "latin1", "ASCII", sub = "q")
+
+  if(grepl("ulv|ule", textfile)) {site <- "ulv"}
+  else if(grepl("gud", textfile)) {site <- "gud"}
+  else if(grepl("skj", textfile)) {site <- "skj"}
+  else if(grepl("ram", textfile)) {site <- "ram"}
+  else if(grepl("ves", textfile)) {site <- "ves"}
+  else if(grepl("fau", textfile)) {site <- "fau"}
+  else if(grepl("vik", textfile)) {site <- "vik"}
+  else if(grepl("arn|arh", textfile)) {site <- "arh"}
+  else if(grepl(".vs|qqvs", textfile)) {site <- "ovs"}
+  else if(grepl("h.g|hqqg", textfile)) {site <- "hog"}
+  else if(grepl("qqlr|aqqlr|.lr|aal|ålr|ål", textfile)) {site <- "alr"}
+  else if(grepl("l.v|laqqv", textfile)) {site <- "lav"}
+  else site <- "panic"
+
+  #check
+   if(!site %in% c("fau", "alr", "ulv", "vik", "hog", "lav", "arh", "ram", "gud", "ovs", "ves", "skj"))stop(paste("wrong site from", textfile))
+  return(site)
 }
+
+
+#### Read in ITAS or UTL ####
+ReadData <- function(textfile){
+  print(textfile)
+  first <- readLines(textfile, n = 1) # read first line to check which logger it is
+  if(grepl("Label", first)){ #check format based on first line
+    dat <- ReadInBodyITAS(textfile)
+  } else if(grepl("Versi", first)){
+    dat <- ReadInBodyUTL(textfile)
+  } else {
+    warning(paste(textfile, "format not recognised")) # warning if logger not recognized
+    dat <- NULL
+  }
+  dat$file <- basename(textfile) # puts file in extra column
+  return(dat)
+}
+
 
 
 #  READ IN ITAS LOGGERS
 ReadInBodyITAS <- function(textfile){
   # import body of data
-  dat <- read.table(textfile, header=TRUE, sep="\t", dec=",", comment.char = "", stringsAsFactors = FALSE)
-  dat[dat == "#-INF"] <- NA # delete #-Inf
-  dat[dat == "#+INF"] <- NA # delete #+Inf
-  dat <- plyr::colwise(gsub, pattern = ",", replacement = ".")(dat)#fixing number formats
-  dat <- dat[-1,] # delete first row with units
+  dat <- readLines(textfile) %>% 
+    gsub(pattern = "\xf8", replacement = "o", x = .) %>% # replace stupid multibyte character with o
+    paste(collapse = "\n") %>% 
+    read_delim(delim = "\t")
   
-  # some files have an extra time column (less than 15 characters)
-  if(nchar(dat$Label[1]) <= 15){
-    date <- paste(sapply(strsplit(dat$Label[1], " "), "[", 1), dat$X, sep=" ")
-    dat$X <- NULL
-  } else { # for normal files
-    date <- dat$Label
-  }
-  dat[,-1] <- plyr::colwise(as.numeric)(dat[,-1]) # remove first column
+  names(dat) <- gsub("-", "", names(dat)) # remove "-" on some column names 
   
-  # convert to date
-  if(stringi::stri_count(date[1], fixed = ":") == 2){
-    dat$date <- dmy_hms(date, tz = "Africa/Algiers")
-  }else{
-    dat$date <- dmy_hm(date, tz = "Africa/Algiers")
-  }
+  dat <- dat %>% 
+    mutate_all(na_if, "#-INF") %>% # remove #-Inf
+    mutate_all(na_if, "#+INF") %>% 
+    mutate_all(gsub, pattern = ",", replacement = ".") %>% # replace comma with dot
+    slice(-1)  # delete first row with units
 
-  dat$Label <- NULL # delete first column
-  attr(dat, "type") <- "ITAS" # give each file an attribute
-  dat <- melt(dat, id=c("date"))
-  colnames(dat)[2] <- "logger"
-  dat$logger <- tolower(dat$logger)
   
+  # some files have an extra time column (should be in X2 column)
+  if(any(names(dat) == "X2")){ 
+    dat <- dat %>% 
+      mutate(date = paste(gsub("(.*) .*", "\\1", Label), X2)) %>% 
+      select(-X2, -Label)
+  } 
+    
+    dat <- dat %>% rename(date = Label)
+  
+   dat <- dat %>% 
+     mutate_at(vars(-date), as.numeric) %>% 
+     mutate(date = dmy_hms(date, truncated = 1, tz = "Africa/Algiers")) %>% 
+     gather(key = logger, value = value, -date) %>% 
+     mutate(logger = tolower(logger))
+   
+   
   # extract site name from file name
-  textfile2 <- basename(textfile)
-  textfile2 <- gsub("ITAS ", "", textfile2)
-  dat$site <- NameCheck(textfile2, textfile2) # check the site name
-  
-  
-  # fixes Fauske Fall 2016 files
-  if(basename(textfile) %in% c("fauske_climate_soil_moist_prec_Fall2016.txt")){
-    message("removing temp data from fauske fall 2016 file")
-    dat <- dat %>%
-      filter(!logger %in% c("temperature", "temperature2"))
-  }
-  if(basename(textfile) %in% c("Fauske_temp_Fall2016.txt")){
-    message("removing soil moisture and precipitation data from fauske fall 2016 file")
-    dat <- dat %>%
-      filter(!logger %in% c("jordf1",	"jordf2", "nedbor"))
-  }
-  
+  dat$site <- NameCheck(basename(tolower(textfile))) # check the site name
+  dat$type <- "ITAS"
+
   return(dat)
 }
 
 
+
 ##### READ IN UTL LOGGERS ####
-ReadInBodyUTL <- function(textfile, SITE){
-  #find sample
+ReadInBodyUTL <- function(textfile){
+  # There are not always the same number of header lines, find last line with Sample
   f <- readLines(textfile, n = 30)
   skip <- which(f == "Sample")
-  if(length(skip) != 1)stop(paste("no Sample", textfile))
-  # import body of data, without header
-  dat <- read.table(textfile, header=FALSE, sep="\t", skip=skip, dec=",", stringsAsFactors = FALSE)
+  if(length(skip) != 1)stop(paste("no Sample", textfile)) # warming is there is no Sample
+  
+  # import data, without header
+  dat <- read_delim(textfile, delim = "\t", skip = skip, col_names = FALSE, locale = local(decimal_mark = ","))
+  
   if(ncol(dat) == 1){
-    dat <- read.table(textfile, header=FALSE, sep=" ", skip=skip, dec=",", stringsAsFactors = FALSE)
-    dat <- data.frame(paste(dat[, 1], dat[, 2]), dat[, 3], stringsAsFactors = FALSE)
+    #dat <- read.table(textfile, header=FALSE, sep=" ", skip=skip, dec=",", stringsAsFactors = FALSE)
+    dat <- read_delim(textfile, delim = " ", skip = skip, col_names = FALSE, locale = local(decimal_mark = ","))
+    dat <- data_frame(paste(dat[, 1], dat[, 2]), dat[, 3])
   }
   if(ncol(dat) == 3){
-    dat <- data.frame(paste(dat[, 1], dat[, 2], sep=" "), dat[, 3], stringsAsFactors = FALSE)
+    dat <- data_frame(paste(dat[, 1], dat[, 2], sep=" "), dat[, 3])
   }
-  colnames(dat) <- c("date", "temp")
-  dat$date <- ymd_hms(dat$date, tz = "Africa/Algiers") # define dates
-  dat$temp <- as.numeric(dat$temp)
   
-  # import head of data to extract logger name
+  dat <- dat %>% 
+    rename(date = X1, value = X2) %>% 
+    mutate(date = ymd_hms(date, tz = "Africa/Algiers"),
+           # replace all commas with dot and make numeric
+           value = as.numeric(gsub(pattern = ",", replacement = ".", x = value)))
+  
+  # import head of data to extract logger and site name
   dat.h <- read.csv(textfile, sep="\t", header=FALSE, nrow=15, stringsAsFactors = FALSE, fileEncoding = "UTF-8")
   temp.logger <- gsub(" ", "",dat.h$V2[4], fixed=TRUE) #extract logger: 30cm or 200cm, delete space between nr and unit
+  
+  # extract site
+  site.logger <- dat.h$V2[3]
   
   # give a warning if logger name is wrong
   if(!temp.logger %in% c("200cm", "30cm")){
@@ -108,32 +130,26 @@ ReadInBodyUTL <- function(textfile, SITE){
   else {t.name <- paste("temp", temp.logger, sep="")}
   
   # rename temp column with temp logger name
-  dat$logger <- t.name
-  colnames(dat)[colnames(dat)=="temp"] <- "value"
-  dat$site <- dat.h$V2[3] # extract site
+  dat <- dat %>% 
+    mutate(logger = t.name,
+           site = site.logger)
+  
+  # Missing site information
   if(dat$site[1] == "" | dat$site[1] == " " ){
-    dat$site <- SITE
-    warning(paste("site imputed for", SITE, basename(textfile)))
+    
+    # extract site name from path
+    SITE <- last(unlist(strsplit(x = dirname(textfile), split = "/")))
+    dat <- dat %>% 
+      mutate(site = SITE)
+    
+    warning(paste("site imputed from path for", SITE, basename(textfile)))
   }
-  dat$site <- NameCheck(dat$site[1], textfile)
-  attr(dat, "type") <- "UTL" # give each file an attribute
-  return(dat)
-}
-
-
-#### Read in ITAS or UTL ####
-ReadData <- function(textfile, site){
-  print(textfile)
-  first <- substring(readLines(textfile, n = 1), 1, 5) # read first line to check which logger it is
-  if(first == "Label"){ #check format based on first line
-    dat <- ReadInBodyITAS(textfile)
-  } else if(first=="Versi"){
-    dat <- ReadInBodyUTL(textfile, site)
-  } else {
-    warning(paste(textfile, "format not recognised")) # warning if logger not recognized
-    dat <- NULL
-  }
-  dat$file <- basename(textfile) # puts file in extra column
+  
+  
+  # check site name
+  dat$site <- NameCheck(tolower(dat$site[1]))
+  dat$type <- "UTL"
+  
   return(dat)
 }
 
