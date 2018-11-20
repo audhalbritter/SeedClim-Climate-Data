@@ -104,7 +104,7 @@ ggsave("FigS4_MonthlyAirGroundTemp.pdf", path = "~/Desktop", width = 10, height 
 
 
 ### GRIDDED CLIMATE DATA
-load("GriddedDailyClimateData2009-2016.RData", verbose = TRUE)
+load("GriddedDailyClimateData2009-2017.RData", verbose = TRUE)
 
 climate2 <- climate %>% 
   filter(Date > "2009-06-30 00:00:00", Date < "2013-12-31 23:00:00")
@@ -129,13 +129,12 @@ FigS2A_MonthlyGriddedPrecip <- monthlyClimate2 %>%
   filter(logger == "Precipitation") %>% 
   group_by(P_level, date) %>% 
   summarise(mean = mean(value, na.rm = TRUE)) %>% 
-  ggplot(aes(x = date, y = mean, color = P_level, linetype = P_level)) +
+  ggplot(aes(x = date, y = mean, color = P_level)) +
   geom_line(size = 0.9) +
   labs(x = "", y = "Average monthly precipitation in mm") +
   scale_color_manual(name = "Precipitation level", values = c("#DFEBF7", "#9DC3E6", "#2E75B6", "#213964"), guide = FALSE) +
-  scale_linetype_manual(name = "Precipitation level", values = c(3, 2, 5, 1), guide = FALSE) + #"dotted", "dashed", "long-dashed", "solid"
+  #scale_linetype_manual(name = "Precipitation level", values = c(3, 2, 5, 1), guide = FALSE) + #"dotted", "dashed", "long-dashed", "solid"
   theme_minimal(base_size = 20)
-
 
 # Boxplots
 FigS2B_MonthlyGriddedPrecip <- monthlyClimate2 %>% 
