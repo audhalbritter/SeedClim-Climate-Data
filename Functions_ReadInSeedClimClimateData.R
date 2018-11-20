@@ -20,7 +20,7 @@ NameCheck <- function(textfile){
   else if(grepl(".vs|qqvs", textfile)) {site <- "ovs"}
   else if(grepl("h.g|hqqg", textfile)) {site <- "hog"}
   else if(grepl("qqlr|aqqlr|.lr|aal|ålr|ål", textfile)) {site <- "alr"}
-  else if(grepl("l.v|laqqv", textfile)) {site <- "lav"}
+  else if(grepl("l.v|laqqv|lqqv|lqv", textfile)) {site <- "lav"}
   else site <- "panic"
 
   #check
@@ -31,7 +31,8 @@ NameCheck <- function(textfile){
 
 #### Read in ITAS or UTL ####
 ReadData <- function(textfile){
-  print(textfile)
+  cat(textfile)
+  cat("\n")
   first <- readLines(textfile, n = 1) # read first line to check which logger it is
   if(grepl("Label", first)){ #check format based on first line
     dat <- ReadInBodyITAS(textfile)
@@ -46,6 +47,7 @@ ReadData <- function(textfile){
 }
 
 
+textfile <- "/Volumes/felles/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site//Skj/ITAS/Skjeldingahaugen_ITAS_111015_120705.txt"
 
 #  READ IN ITAS LOGGERS
 ReadInBodyITAS <- function(textfile){
@@ -70,10 +72,13 @@ ReadInBodyITAS <- function(textfile){
       mutate(date = paste(gsub("(.*) .*", "\\1", Label), X2)) %>% 
       select(-X2, -Label)
   } 
-    
-    dat <- dat %>% rename(date = Label)
   
-   dat <- dat %>% 
+  else {
+    dat <- dat %>% rename(date = Label)
+  }
+
+  
+  dat <- dat %>% 
      mutate_at(vars(-date), as.numeric) %>% 
      mutate(date = dmy_hms(date, truncated = 1, tz = "Africa/Algiers")) %>% 
      gather(key = logger, value = value, -date) %>% 
@@ -87,7 +92,8 @@ ReadInBodyITAS <- function(textfile){
   return(dat)
 }
 
-
+textfile <- "/Volumes/felles/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site//Lav/UTL/1239_23062009.txt"
+textfile <- "/Volumes/felles/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site//Ves/UTL/#001047_20081030_0000_Veskre.txt"
 
 ##### READ IN UTL LOGGERS ####
 ReadInBodyUTL <- function(textfile){
@@ -97,15 +103,18 @@ ReadInBodyUTL <- function(textfile){
   if(length(skip) != 1)stop(paste("no Sample", textfile)) # warming is there is no Sample
   
   # import data, without header
-  dat <- read_delim(textfile, delim = "\t", skip = skip, col_names = FALSE, locale = local(decimal_mark = ","))
+  dat <- read_delim(textfile, delim = "\t", skip = skip, col_names = FALSE, locale = locale(decimal_mark = ","))
   
   if(ncol(dat) == 1){
-    #dat <- read.table(textfile, header=FALSE, sep=" ", skip=skip, dec=",", stringsAsFactors = FALSE)
-    dat <- read_delim(textfile, delim = " ", skip = skip, col_names = FALSE, locale = local(decimal_mark = ","))
-    dat <- data_frame(paste(dat[, 1], dat[, 2]), dat[, 3])
+    dat <- read.table(textfile, header=FALSE, sep=" ", skip=skip, dec=",", stringsAsFactors = FALSE)
+    dat <- data.frame(paste(dat[, 1], dat[, 2]), dat[, 3], stringsAsFactors = FALSE)
+    names(dat) <- c("X1", "X2")
+    dat <- dat %>% 
+      as.tibble()
+    #dat <- data_frame(X1 = paste(dat[[1]], dat[[2]]), X2 = dat[[3]])
   }
   if(ncol(dat) == 3){
-    dat <- data_frame(paste(dat[, 1], dat[, 2], sep=" "), dat[, 3])
+    dat <- data_frame(X1 = paste(dat[[1]], dat[[2]], sep=" "), X2 = dat[[3]])
   }
   
   dat <- dat %>% 
@@ -115,7 +124,8 @@ ReadInBodyUTL <- function(textfile){
            value = as.numeric(gsub(pattern = ",", replacement = ".", x = value)))
   
   # import head of data to extract logger and site name
-  dat.h <- read.csv(textfile, sep="\t", header=FALSE, nrow=15, stringsAsFactors = FALSE, fileEncoding = "UTF-8")
+  dat.h <- read.delim(textfile, header = FALSE, nrows = skip)
+  
   temp.logger <- gsub(" ", "",dat.h$V2[4], fixed=TRUE) #extract logger: 30cm or 200cm, delete space between nr and unit
   
   # extract site
@@ -135,10 +145,14 @@ ReadInBodyUTL <- function(textfile){
            site = site.logger)
   
   # Missing site information
-  if(dat$site[1] == "" | dat$site[1] == " " ){
-    
+  if(grepl("| |Nr. 1 - luft", site.logger)){
+    #textfile)dat$site[1] == "" | dat$site[1] == " " 
     # extract site name from path
     SITE <- last(unlist(strsplit(x = dirname(textfile), split = "/")))
+    # if site is UTL (from other place where data is stored)
+    if(SITE == "UTL"){
+      SITE <- unlist(strsplit(x = dirname(textfile), split = "/"))[length(unlist(strsplit(x = dirname(textfile), split = "/")))-1]
+    }
     dat <- dat %>% 
       mutate(site = SITE)
     
