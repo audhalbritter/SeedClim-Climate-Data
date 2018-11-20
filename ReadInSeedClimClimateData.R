@@ -1,22 +1,83 @@
 ####################################
-# READ IN SEEDCLIM CLIMATE DATA
+ # READ IN SEEDCLIM CLIMATE DATA #
 ####################################
 
-#### IMPORT CLIMATE DATA FOR ALL SITES
-source('~/Dropbox/Bergen/SeedClim Climate/SeedClim-Climate-Data/Functions_ReadInSeedClimClimateData.R', echo=TRUE)
+### LIBRARIES
+library("lubridate")
+library("tidyverse")
+library("data.table")
 
-climate <- plyr::ldply(c("Fau", "Alr", "Ulv", "Vik", "Hog", "Lav", "Arh", "Ram", "Gud", "Ovs", "Ves", "Skj"), ImportData)
-head(climate)
+#### IMPORT CLIMATE DATA FOR ALL SITES ####
+source('~/Dropbox/Bergen/SeedClim Climate/SeedClim-Climate-Data/Functions_ReadInSeedClimClimateData.R')
+
+# DATA FROM OLD PLACE
+oldClimateRepo <- list.files(path = "/Volumes/felles/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site/", 
+                             pattern = "txt", recursive = TRUE, full.names = TRUE) %>% 
+  grep(pattern = "Notes|Notater|UVB", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
+  grep(pattern = "ITAS\\d{0,4}\\.txt|ITAS-FALL-2014\\.txt", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
+  ### files that need fixing!!!
+  grep(pattern = "1239_23062009.txt", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
+  #(function(.).[(1:50)]) %>% # only run subset
+  map_df(ReadData) %>% 
+  mutate(Repo = "old_Bio_Felles")
+
+# DATA FROM NEW PLACE
+newClimateRepo <- list.files(path = "/Volumes/felles/MATNAT/BIO/Ecological and Environmental Change/SeedClimClimateData/Climate_data_loggers", 
+#climate2 <- list.files(path = "~/Dropbox/seedclim klimadaten/rawdata by Site", 
+           pattern = "txt", recursive = TRUE, full.names = TRUE) %>% 
+  grep(pattern = "Notes|Notater|UVB", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
+  grep(pattern = "ITAS\\d{0,4}\\.txt|ITAS-FALL-2014\\.txt", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
+  #(function(.).[(1:50)]) %>% # only run subset
+  map_df(ReadData) %>% 
+  mutate(Repo = "new_Bio_EcologicalandEnvironmentalChange")
+
+# Warnings that are ok
+# format not recognised: Skjellingahaugen-met1-20120910.txt format not recognised (corrupted file)
+
+# remove first two and last two rows for each file.
+newClimateRepo <- newClimateRepo %>% 
+  group_by(file) %>% 
+  slice(-c(1:2, n()-1, n()))
+
+# bind rows of old and new repo
+climate <- oldClimateRepo %>% 
+  # remove wrong files
+  filter(file != "Skjellingahaugen_ITAS_110624_111015.txt") %>% 
+  group_by(file) %>% 
+  # remove first two and last two rows for each file.
+  slice(-c(1:2, n()-1, n())) %>% 
+  bind_rows(newClimateRepo) %>% 
+  setDT()
+
+# remove duplicate files
+climate <- climate %>% 
+  group_by(date, logger, site, type, value) %>% 
+  slice(1) %>% 
+  group_by(date, logger, site, type) %>% 
+  slice(1)
+
+#save(climate, file = "climate.Rdata")
+#load(file = "climate.Rdata")  
+
+
+#### CLEAN DATA ####
+# get rid of 1900 date, all empty lines
+climate <- climate %>% 
+  filter(!date < "2000-01-01")
+
+
+# Check logger names
 unique(climate$logger)
 table(climate$logger, climate$site)
 
-# get rid of 1900 date, all empty lines
-climate <- climate %>% filter(!date < "2000-01-01")
+# check if there is still an x3 and NA
+climate %>% filter(logger == "x3") %>% ungroup() %>% distinct(file, Repo)
+climate %>% filter(is.na(logger))
 
 # Subset soilmoisture, precipitation and temperatur loggers into seperate object
-temperature <- subset(climate, logger %in% c("temp1", "temp2", "temp200cm", "temp30cm", "", "PØN", "-5cm", "thermistor.1", "thermistor.2"))
-precipitation <- subset(climate, logger %in% c("nedbor", "counter"))
-soilmoisture <- subset(climate, logger %in% c("jordf1", "jordf2", "soil.moisture", "soil.moisture.1", "soil.moisture.2", "sm300.1", "sm300.2"))
+temperature <- subset(climate, logger %in% c("temp1", "temp2", "temp200cm", "temp30cm", "", "PØN", "-5cm", "thermistor 1", "thermistor 2", "jord-5cm", "2m", "temperature", "temperature2", "soil temp", "veg. temp", "veg temp"))
+precipitation <- subset(climate, logger %in% c("nedbor", "rain", "arg100", "counter", "counter1", "counter2"))
+soilmoisture <- subset(climate, logger %in% c("jordf1", "jordf2", "soil.moisture", "soil moisture 2", "soil moisture 1", "soil moisture", "sm300 2", "sm300 1", "jordfukt2"))
 
 save(precipitation, file = "Precipitation.RData")
 save(soilmoisture, file = "Soilmoisture.RData")
@@ -44,11 +105,20 @@ temperature %>%
   group_by(file) %>%
   summarise(n = n(), MIN = min(date), max = max(date))
   
+temperature %>% 
+  filter(type == "UTL") %>% 
+  ungroup() %>% 
+  distinct(logger, site)
 
 #### DATA CLEANING ####
-temperature$flag <- NA # add column for remarks, when data is doubtfull
+temperature %>% 
+  # add column for remarks, when data is doubtfull
+  mutate(flag = NA) %>%  
+  
+  # delete crap UTL data
+  filter(! site %in% c("lav", "gud", "ovs") & logger == "-5cm")
 
-# delete crap UTL data
+
 temperature <- temperature[!(temperature$site == "Lav" & temperature$logger == "-5cm"),]
 temperature <- temperature[!(temperature$site == "Gud" & temperature$logger == "-5cm"),]
 temperature <- temperature[!(temperature$site == "Ovs" & temperature$logger == "-5cm"),]
@@ -62,6 +132,22 @@ temperature$logger[temperature$logger == "-5cm"] <- "temp30cm"
 temperature$logger[temperature$file == "1229_30092009.txt"] <- "temp30cm"
 temperature$logger[temperature$file == "2488_21092010.txt"] <- "temp200cm"
 temperature$logger[temperature$logger == ""] <- "temp30cm"
+
+
+
+### THIS NEEDS TO BE FIXED HERE!!!
+# # fixes Fauske Fall 2016 files
+# if(basename(textfile) %in% c("fauske_climate_soil_moist_prec_Fall2016.txt")){
+#   message("removing temp data from fauske fall 2016 file")
+#   dat <- dat %>%
+#     filter(!logger %in% c("temperature", "temperature2"))
+# }
+# if(basename(textfile) %in% c("Fauske_temp_Fall2016.txt")){
+#   message("removing soil moisture and precipitation data from fauske fall 2016 file")
+#   dat <- dat %>%
+#     filter(!logger %in% c("jordf1",	"jordf2", "nedbor"))
+# }
+
 
 # ITAS data
 # FAUSKE: delete temp1 and temp2 logger between June 2013 and October 2014 wrong values
