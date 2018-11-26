@@ -23,15 +23,15 @@ load("Monthly.Temperature_2008-2017.Rdata")
 
 ##  Overview
 
-Climate data from climate logger at 12 the SeedClim / FunCaB sites from the period of 2008 - oct 2018, hourly values
+Climate data from climate logger at 12 SeedClim / FunCaB sites from the period of 2008 - oct 2018, hourly values
 
 
-Climate variables are (unit / varible name)
+Climate variables are (unit / variable name)
 
- - Hourly air temperature 2m above the gorund (°C, temp200cm)  
- - Hourly air temperature 30cm above the gorund (°C, temp30cm)  
- - Hourly air temperature 0m above the gorund / in the vegetation (°C, tempabove)  
- - Hourly soil temperature 5cm below the gorund (°C, tempsoil)  
+ - Hourly air temperature 2m above the ground (°C, temp200cm)  
+ - Hourly air temperature 30cm above the ground (°C, temp30cm)  
+ - Hourly air temperature 2cm above the ground / in the vegetation (°C, tempabove)  
+ - Hourly soil temperature 5cm below the ground (°C, tempsoil)  
  - Hourly soilmoisture (%, soilmoisture). Always 2 loggers per site! Mean not calculated yet
  - Hourly precipitation (mm, precipitation). Data not cleaned, very messy
 
@@ -44,8 +44,12 @@ Daily and monthly mean data for each site is available for all temperature logge
 
 #### Data storage and file format
 The data is provided in .txt files.
+The raw data is stored on the UiB common server (P drive). The data is stored in two different places. We have R code to read in all the data and remove duplicate fiels.
 
-The raw data is stored on the UiB common server (P drive):
+Old repo:
+path = "/Volumes/felles/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site/"
+
+New repo:
 path = "/Volumes/felles/MATNAT/BIO/Ecological and Environmental Change/SeedClimClimateData/Climate_data_loggers"
 
 ITAS loggers are in separate folders for each year and spring/fall data collection
@@ -65,7 +69,7 @@ The code to import the climate data from the .txt files is: 'ReadInSeedClimClima
 #### Data cleaning
 Temperature data:
 Wrong values are removed (visual estimation of too low or high values)
-Problematic data are flaged.
+Problematic data are flagged.
 Wrong logger names have been corrected.
 Soil and aboveground temperature data have been switched if they are mixed up.
 
