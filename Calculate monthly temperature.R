@@ -9,7 +9,7 @@ load("Temperature.RData", verbose = TRUE)
 #### Calculate monthly means ####
 threshold <-  3 * 7 * 24 # three weeks. Minimum accepted
 
-monthlyTemperature <- temperature %>%
+monthlyTemperature <- temperature2 %>%
   filter(!is.na(value)) %>%
   mutate(date = dmy(paste0("15-",format(date, "%b.%Y")))) %>%
   group_by(date, logger, site) %>%
@@ -24,6 +24,9 @@ full_grid <- expand.grid(logger = unique(monthlyTemperature$logger), site = uniq
 monthlyTemperature <- left_join(full_grid, monthlyTemperature) %>% tbl_df()
 
 monthlyTemperature$site <- factor(monthlyTemperature$site, levels=c("Skj", "Gud", "Lav", "Ulv", "Ves", "Ram", "Hog", "Alr", "Ovs", "Arh", "Vik", "Fau"))
+
+monthlyTemperature <- monthlyTemperature %>% 
+  mutate(site = factor(site, levels = c("Skjellingahaugen", "Gudmedalen", "Lavisdalen", "Ulvehaugen", "Veskre", "Rambera", "Hogsete", "Alrust", "Ovstedalen", "Arhelleren", "Vikesland", "Fauske")))
 
 save(monthlyTemperature, file = "Monthly.Temperature_2008-2017.RData")
 
@@ -70,7 +73,7 @@ monthly %>%
 
 
 #### Calculate daily means ####
-dailyTemperature <- temperature %>%
+dailyTemperature <- temperature2 %>%
   filter(!is.na(value)) %>%
   mutate(date = dmy(format(date, "%d.%b.%Y"))) %>%
   group_by(date, logger, site) %>%
@@ -90,7 +93,9 @@ filler <- expand.grid(
   )
 )
 dailyTemperature <- merge(dailyTemperature, filler, all = TRUE)
-dailyTemperature$site <- factor(dailyTemperature$site, levels=c("Skj", "Gud", "Lav", "Ulv", "Ves", "Ram", "Hog", "Alr", "Ovs", "Arh", "Vik", "Fau"))
+
+dailyTemperature <- dailyTemperature %>% 
+  mutate(site = factor(site, levels = c("Skjellingahaugen", "Gudmedalen", "Lavisdalen", "Ulvehaugen", "Veskre", "Rambera", "Hogsete", "Alrust", "Ovstedalen", "Arhelleren", "Vikesland", "Fauske")))
 
 save(dailyTemperature, file = "Daily.Temperature_2008-2017.RData")
 
