@@ -48,7 +48,26 @@ monthlyClimate <- climate %>%
   gather(key = Logger, value = value, -Site, -Date) %>% 
   mutate(dateMonth = dmy(paste0("15-",format(Date, "%b.%Y")))) %>%
   group_by(dateMonth, Logger, Site) %>%
-  summarise(n = n(), value = mean(value))
+  summarise(n = n(), value = mean(value), sum = sum(value)) %>% 
+  mutate(value = ifelse(Logger == "Precipitation", sum, value)) %>% 
+  select(-n, -sum)
+
+
+climate %>%
+  as.tibble() %>% 
+  # mutate(dateMonth = dmy(paste0("15-",format(Date, "%b.%Y")))) %>%
+  # group_by(Site, dateMonth) %>% 
+  # summarise(value = sum(Precipitation)) %>% 
+  mutate(Year = year(Date)) %>% 
+  group_by(Year, Site) %>% 
+  summarise(value = sum(Precipitation)) %>% 
+  # filter(Logger == "Precipitation") %>% 
+  # mutate(year = year(dateMonth)) %>%
+  # group_by(Site, year) %>%
+  # summarise(value = sum(value)) %>%
+  ggplot(aes(x = Year, y = value)) +
+  geom_point() +
+  facet_wrap(~ Site)
 
 
 # Calculate Annual Means
