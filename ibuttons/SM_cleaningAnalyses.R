@@ -1,4 +1,8 @@
 #### soil moisture ####
+
+library(readxl)
+library(tidyverse)
+
 #seedclim site-level soil moisture
 #load("/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_groups/SeedClim-Climate-Data/Soilmoisture.RData")
 source("/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_groups/SeedClim-Climate-Data/plotting_dim.R")
@@ -6,11 +10,12 @@ source("/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_g
 
 #use soil moisture differences!
 # read in soil moisture data FUNCAB point measurements
-SM201516 <- read_excel("/Volumes/fja062/PhD/Data/soilMoisture/Soilmoisture_1516.xlsx")
+SM201516 <- read_excel("~/OneDrive - University of Bergen/Research/FunCaB/Data/Soilmoisture_1516.xlsx")
 #SM2017 <- read_excel(path = "/Volumes/fja062/PhD/Data/Soilmoisture2017.xlsx")
 
+SM201516 <- SM201516 %>% 
+  mutate_at(.vars = c("M1", "M2", "M3", "M4"), as.numeric)
 
-SM201516[, 8 : 11] <- plyr::colwise(as.numeric)(SM201516[, 8 : 11])
 
 SM201516 <- SM201516 %>% 
   mutate(T_level = recode(site, Ulv = 6.5, Lav = 6.5,  Gud = 6.5, Skj = 6.5, Alr = 8.5, Hog = 8.5, Ram = 8.5, Ves = 8.5, Fau = 10.5, Vik = 10.5, Arh = 10.5, Ovs = 10.5)) %>%

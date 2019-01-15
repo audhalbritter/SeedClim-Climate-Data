@@ -1,5 +1,6 @@
-source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/plotting_dim.R")
+source("~/OneDrive - University of Bergen/Research/FunCaB/SeedclimComm/inst/graminoidRemovals/plotting_dim.R")
 
+library(tidyverse)
 
 #################### 
 ##### plotting ##### 

@@ -1,9 +1,11 @@
 library(lme4)
 library(tidyverse)
 library(broom)
+library(lubridate)
 
 source("/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_groups/SeedClim-Climate-Data/plotting_dim.R")
 
+load("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/ibuttons/maxmin.RData")
 #Q1 – does removal of functional groups affect soil temperature?
   #And if so, is one more important than another?
 #a. treatment as predictor
