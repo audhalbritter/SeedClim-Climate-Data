@@ -2,6 +2,7 @@
 
 library(readxl)
 library(tidyverse)
+library(lubridate)
 
 #seedclim site-level soil moisture
 #load("/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_groups/SeedClim-Climate-Data/Soilmoisture.RData")
@@ -14,10 +15,7 @@ SM201516 <- read_excel("~/OneDrive - University of Bergen/Research/FunCaB/Data/S
 #SM2017 <- read_excel(path = "/Volumes/fja062/PhD/Data/Soilmoisture2017.xlsx")
 
 SM201516 <- SM201516 %>% 
-  mutate_at(.vars = c("M1", "M2", "M3", "M4"), as.numeric)
-
-
-SM201516 <- SM201516 %>% 
+  mutate_at(.vars = c("M1", "M2", "M3", "M4"), as.numeric) %>% 
   mutate(T_level = recode(site, Ulv = 6.5, Lav = 6.5,  Gud = 6.5, Skj = 6.5, Alr = 8.5, Hog = 8.5, Ram = 8.5, Ves = 8.5, Fau = 10.5, Vik = 10.5, Arh = 10.5, Ovs = 10.5)) %>%
   mutate(Temp = recode(site, Ulv=6.17, Lav=6.45, Gud=5.87, Skj=6.58, Alr=9.14, Hog=9.17, Ram=8.77, Ves=8.67, Fau=10.3, Vik=10.55, Arh=10.60, Ovs=10.78))%>%
   mutate(Precip= recode(site, Ulv=596, Lav=1321, Gud=1925, Skj=2725, Alr=789, Hog=1356, Ram=1848, Ves=3029, Fau=600, Vik=1161, Arh=2044, Ovs=2923))%>%

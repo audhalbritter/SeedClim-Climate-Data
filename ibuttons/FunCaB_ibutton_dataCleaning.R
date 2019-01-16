@@ -1,8 +1,8 @@
 #### FUNCAB iButton Data ######
-library("tidyverse")
-library("lubridate")
-library("readr")
-library("readxl")
+library(tidyverse)
+library(lubridate)
+library(readr)
+library(readxl)
 library(quantreg)
 library(broom)
 
@@ -80,17 +80,43 @@ ReadIniButtons <- function(textfile){
 
 
 # read in iButtonID dictionary 2016
-dictionary16 <- read_excel(path = "/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_groups/SeedClim-Climate-Data/iButtonDictionary.xlsx", sheet = 1, col_names = TRUE)
+dictionary16 <- read_excel(path = "~/OneDrive - University of Bergen/Research/FunCaB/Data/iButtonDictionary.xlsx", sheet = 1, col_names = TRUE)
 
 dictionary16 <- dictionary16 %>% 
-  mutate(Block = plyr::mapvalues(Block, c("FCIII", "FCII", "FCI", "FCV", "FCIV", "FCXV", "FCXII", "FCXIII", "FCI ", "FCVI", "FCVIII", "IX", "II", "V", "E2"), c("3", "2", "1", "5", "4", "15", "12", "13", "1","6", "8", "9", "2", "5", "E2"))) %>%
-  mutate(ID = paste0(iButtonID, "_", Year))
+  mutate(Block = case_when(Block == "FCIII"  ~ "3",
+                           Block == "FCII"   ~ "2",
+                           Block ==  "FCI"   ~ "1",
+                           Block == "FCV"    ~ "5",
+                           Block == "FCIV"   ~ "4",
+                           Block == "FCXV"   ~ "15",
+                           Block == "FCXII"  ~ "12",
+                           Block == "FCXIII" ~ "13",
+                           Block == "FCVI"   ~ "6",
+                           Block == "FCVIII" ~ "8",
+                           Block == "IX"     ~ "9",
+                           Block == "II"     ~ "2",
+                           Block == "V"      ~ "5",
+                           Block == "E2"     ~ "E2")) %>% 
+  mutate(ID = paste0(iButtonID, "_", Year)) %>% 
+  select(-TTC)
 
 # read in iButtonID dictionary 2017
-dictionary17 <- read_excel(path = "/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_groups/SeedClim-Climate-Data/iButtonDictionary.xlsx", sheet = 2, col_names = TRUE)
+dictionary17 <- read_excel(path = "~/OneDrive - University of Bergen/Research/FunCaB/Data/iButtonDictionary.xlsx", sheet = 2, col_names = TRUE)
 dictionary17 <- dictionary17 %>% 
-  mutate(siteID = plyr::mapvalues(siteID, c("LAV", "GUD", "SKJ", "ULV", "ALR", "FAU", "HOG", "VIK", "RAM", "VES", "OVS", "ARH"), c("Lavisdalen", "Gudmedalen", "Skjellingahaugen", "Ulvhaugen", "Alrust", "Fauske", "Hogsete", "Vikesland", "Rambera", "Veskre", "Ovstedal", "Arhelleren"))) %>% 
-  mutate(ID = paste0(iButtonID, "_", Year))
+  mutate(siteID = case_when(siteID == "LAV" ~ "Lavisdalen",
+                            siteID == "GUD" ~ "Gudmedalen", 
+                            siteID == "SKJ"~ "Skjellingahaugen", 
+                            siteID == "ULV" ~ "Ulvhaugen", 
+                            siteID == "ALR" ~ "Alrust", 
+                            siteID == "FAU" ~ "Fauske", 
+                            siteID == "HOG" ~ "Hogsete",
+                            siteID == "VIK" ~  "Vikesland", 
+                            siteID == "RAM" ~ "Rambera", 
+                            siteID == "VES" ~ "Veskre", 
+                            siteID == "OVS" ~ "Ovstedal", 
+                            siteID == "ARH" ~ "Arhelleren")) %>% 
+  mutate(ID = paste0(iButtonID, "_", Year)) %>% 
+  select(-TTC)
 
 
 dictionary <- dictionary16 %>% 
@@ -98,8 +124,8 @@ dictionary <- dictionary16 %>%
   mutate(ID = gsub(pattern = ".csv", "", ID),
          ID = gsub(pattern = "000000", "", ID),
          ID = gsub(pattern = ".txt", "", ID),
-         ID = gsub(pattern = " DS1922L", "", ID))
-  #filter(!Comments %in% c("CSV file missing", "FAIL", "Lost", "NO DATA", "no data on iButton", "X", "X Dead"))
+         ID = gsub(pattern = " DS1922L", "", ID)) %>% 
+  filter(!Comments %in% c("CSV file missing", "FAIL", "Lost", "NO DATA", "no data on iButton", "X", "X Dead"))
 
 
 # MAKE LIST OF ALL TXT FILES AND MERGE THEM TO ONE DATA FRAME
@@ -119,7 +145,7 @@ trial <- mdat %>%
          ID = gsub(pattern = "000000", "", ID),
          ID = gsub(pattern = ".txt", "", ID),
          ID = gsub(pattern = " DS1922L", "", ID)) %>% 
-  filter(!ID %in% c("093E41FB41_2017", "5E3E332741_2017", "843E3EA341_2017", "263E0D9441_2017", "FC3E48CE41second_2017")) %>% 
+  filter(!ID %in% c("093E41FB41_2017", "5E3E332741_2017", "843E3EA341_2017", "263E0D9441_2017", "FC3E48CE41second_2017")) %>%
   mutate(ID = gsub(pattern = "123E354941_2017", "123E354941_2016", ID),
          ID = gsub(pattern = "0440282241_2017", "440282241_2017", ID),
          ID = gsub(pattern = "9C3E407D41_2017", "3E407D41_2016", ID),
@@ -137,8 +163,10 @@ trial <- mdat %>%
 trial <- trial %>% 
   mutate(Year = as.numeric(Year)) %>% 
   left_join(dictionary, by = c("ID", "siteID")) %>%
-  select(-iButtonID.x, -iButtonID.y, -Year.x, -Year.y, -X__1) %>% 
-  mutate(Treatment = if_else(ID == "3E369341_2016", "GB", Treatment))
+  select(-iButtonID.x, -iButtonID.y, -Year.x) %>% 
+  mutate(Treatment = if_else(ID == "3E369341_2016", "GB", Treatment)) %>% 
+  rename(Year = Year.y) %>% 
+  filter(!Block %in% c("E5", "E2"))
 
 # Check start and end date
 trial %>% 
@@ -181,13 +209,18 @@ iButtonData <- trial %>%
          !(siteID == "Gudmedalen" & format(Date, "%Y-%m-%d") < "2016-05-26" & Value > 30),
          !(siteID == "Skjellingahaugen" & format(Date, "%Y-%m-%d") < "2015-10-01" & Value > 15),
          !(siteID == "Veskre" & format(Date, "%Y-%m-%d") < "2015-07-30"),
-         Value - lag(Value) < 10,
+         Value - dplyr::lag(Value) < 10,
          Value > -20,
          Value < 40)
 
+iButtonData <- iButtonData %>% 
+  mutate(shortsiteID = substr(siteID, 1, 3)) %>% 
+  unite(turfID, shortsiteID, Block, Treatment, sep = "", remove = FALSE) %>% 
+  select(-shortsiteID) %>% 
+  left_join(dict_TTC_turf)
 
 ##### save and load ibutton data #######
-#save(iButtonData, file = "iButton2016-2017.RData")
+#save(iButtonData, file = "~/OneDrive - University of Bergen/Research/FunCaB/Data/iButton2016-2017.RData")
 load("iButton2016-2017.RData")
 
 iButtonData %>%
@@ -205,6 +238,8 @@ iButtonData %>%
 
 # read in UVB data
 # source the Functions_ReadInSeedClimClimate script
+source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/ibuttons/Functions_ReadInUVBData.R")
+
 uvb <- ImportData(site = c("Ovstedal", "Arhelleren", "Veskre", "Skjellingahaugen", "Rambera", "Fauske", "Alrust", "Ulvhaugen", "Vikesland", "Hogsete", "Lavisdalen", "Gudmedalen"))
 
 

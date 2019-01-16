@@ -131,11 +131,11 @@ ggplot(FD, aes(x = as.factor(Precipitation_level), y = sum, colour = Treatment))
   ggsave(filename = "frostDays_15-16.jpg", path = "/Users/fja062/Documents/seedclimComm/figures/", dpi = 300, width = 11, height = 5)
 
 
-lav <- soilTemp %>%
+alpine <- soilTemp %>%
   mutate(weather = case_when(sunniness > 0.66 ~ "sunny",
                              sunniness > 0.33 ~ "variable",
                              sunniness < 0.33 ~ "cloudy")) %>% 
-  filter( weather %in% c("sunny", "cloudy"), between(date, ymd("2015-08-01"), ymd("2015-09-01")), siteID == "Lavisdalen") %>% 
+  filter( weather %in% c("sunny", "cloudy"), between(date, ymd("2015-08-01"), ymd("2015-09-01")), Temperature_level == 6.5) %>% 
   ggplot(aes(x = hour, y = Value, colour = Treatment, linetype = weather)) +
   geom_smooth(se = FALSE, method = "loess") +
   scale_colour_manual("Functional groups", values = c(cbPalette[3],"black", cbPalette[c(7,5,6,2,4,10,1)]), limits = c("temp200cm","FGB","GF", "GB", "FB", "G", "F", "B", "C"), labels = c("air 200cm","Bare ground","Bryophytes", "Forbs","Graminoids", "Bryophytes and forbs", "Graminoids and bryophytes", "Forbs and graminoids", "Bryophytes, forbs and\ngraminoids")) +
@@ -190,7 +190,7 @@ FD %>%
         axis.title=element_text(size=15))
 
 y <- soilTemp %>%
-  filter(between(date, ymd("2015-07-15"), ymd("2016-06-29")),siteID == "Lavisdalen", !Treatment == "temp200cm") %>% 
+  filter(between(date, ymd("2015-07-15"), ymd("2016-06-29")), Temperature_level == 6.5, !Treatment == "temp200cm") %>% 
   #mutate(Treatment = factor(Treatment, levels = c("C", "FB", "GB", "GF", "FGB"))) %>% 
   group_by(Treatment, date) %>% 
   mutate(meanTemp = mean(Value)) %>% 
