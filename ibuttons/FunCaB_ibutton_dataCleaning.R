@@ -333,7 +333,7 @@ source("/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_g
 #### compiling the data #### 
 soilTemp <- iButtonData %>% 
   mutate(hour = hour(Date), date = date(Date)) %>% 
-  select(-Date, -DOY, -Comments, -TTC, -ReplacementDate2018, -RemovalDate, -ReplacementDate) %>% 
+  select(-Date, -DOY, -Comments, -ReplacementDate2018, -RemovalDate, -ReplacementDate) %>% 
   bind_rows(temperature) %>% 
   left_join(sunniness) %>% 
   select(-sunniness.old) %>% 
@@ -343,9 +343,10 @@ soilTemp <- iButtonData %>%
     hour %in% c(19,20,7,8,9) ~ "spinup"))
 
 soilTemp <- climate %>% 
-  left_join(soilTemp)
+  left_join(soilTemp) %>% 
+  filter(!turfID == "Lav3GF")
 
-save(soilTemp, file = "soilTemp.RData")
+save(soilTemp, file = "~/OneDrive - University of Bergen/Research/FunCaB/Data/soilTemp.RData")
 
 
 
@@ -356,11 +357,13 @@ bio15 <- read_excel("/Volumes/fja062/PhD/Data/biomass/biomass_2015.xlsx")
 
 bio15 <- bio15 %>% 
   mutate(siteID = plyr::mapvalues(Site, from = dict_Site$v2, to = dict_Site$new)) %>% 
+  select(-Site)
   
 
 
-biomass <- bio %>% 
-  mutate(siteID = plyr::mapvalues(Site, from = dict_Site$v2, to = dict_Site$new)) %>% 
+biomass <- bio %>%
+  mutate(siteID = plyr::mapvalues(Site, from = dict_Site$old, to = dict_Site$new)) %>% 
+  bind_rows(bio15) %>% 
   group_by(Year, siteID, Treatment, Func_group, Block) %>% 
   mutate(biomass_sum = sum(Biomass_g)) %>%
   group_by(Year, siteID, Treatment, Func_group) %>% 
@@ -374,7 +377,7 @@ biomass <- bio %>%
                                        if_else(siteID %in% c("Lavisdalen","Hogsete", "Vikesland"), "1.2",
                                                ifelse(siteID %in% c("Rambera", "Gudmedalen", "Arhelleren"), "2.0", "2.7")))) %>%
   mutate(Precipitation_level = as.numeric(Precipitation_level), Temperature_level = as.numeric(Temperature_level)) %>% 
-  distinct(Year, Block, Treatment, Func_group)
+  distinct(Year, Block, Treatment, Func_group, .keep_all = TRUE)
 
 
 
@@ -383,8 +386,8 @@ biomass %>%
   #filter(Treatment %in% c("C", "FGB", "F", "G", "B")) %>%
   ggplot(aes(x = Treatment, y = Biomass_g, fill = Func_group)) +
   geom_col() +
-  facet_grid(Precipitation_level ~ Temperature_level, labeller = labeller(Temperature_level = temp.lab, Precipitation_level = precip.lab)) +
-  scale_fill_manual(values = cbPalette[c(3, 8, 4)], labels = c("Bryophyte", "Forb", "Graminoid"), name = "Removal") +
+  facet_grid(Precipitation_level ~ Temperature_level) +
+  #scale_fill_manual(values = cbPalette[c(3, 8, 4)], labels = c("Bryophyte", "Forb", "Graminoid"), name = "Removal") +
   labs(y = "Removed biomass (g)") +
   theme_classic() +
   axis.dim 
