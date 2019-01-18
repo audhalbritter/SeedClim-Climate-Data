@@ -344,7 +344,7 @@ soilTemp <- iButtonData %>%
 
 soilTemp <- climate %>% 
   left_join(soilTemp) %>% 
-  filter(!turfID == "Lav3GF")
+  filter(!turfID == "Lav3GF") # removed due to irregular logging
 
 save(soilTemp, file = "~/OneDrive - University of Bergen/Research/FunCaB/Data/soilTemp.RData")
 

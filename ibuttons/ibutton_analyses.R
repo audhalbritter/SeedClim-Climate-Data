@@ -58,18 +58,6 @@ vegCompmod1plot  <- vegCompMaxmod1 %>%
 ggsave(vegCompmod1plot, file = "~/Documents/seedclimComm/figures/vegCompmodT3plotFINAL.jpg", dpi = 300, width = 6, height = 4)
 
 
-vegCompMaxmod1 <- modTreat1 %>% 
-  filter(!term == "(Intercept)",
-         !term == "sunniness",
-         !term == "scale(Temp)") %>% 
-  filter(!grepl("^sd_", term)) %>% 
-  # %>% 
-  #filter(!grepl("_|sunn", term)) %>% 
-  mutate(term = gsub("scale\\(|\\)", "", term),
-         term = gsub("Treatment", "", term),
-         term = gsub("^C", "Control", term))
-
-
 vegCompmod1plotZOOM  <- vegCompMaxmod1 %>% 
   ggplot(aes(x = term, y = estimate, ymin = lower, ymax = upper, fill = term2, colour = term2)) +
   geom_errorbar(width = 0, position = position_dodge(width = 0.5)) +
@@ -112,7 +100,7 @@ modCover <- maxmin %>%
 vegCompMaxmod1C <- modCover %>% 
   filter(!term == "(Intercept)") %>% 
   filter(!grepl("^sd_", term),
-         climate == "Temp",
+         #climate == "Temp",
          !term == "scale(climVal)",
          !term == "sunniness") %>% 
   #filter(!grepl("_|sunn", term)) %>% 
@@ -127,17 +115,18 @@ vegCompMaxmod1C <- modCover %>%
   )) %>%
   mutate(term2 = if_else(grepl("sunniness:", term), "PFG x UV",
                          if_else(grepl(":sunniness", term), "PFG x UV",
-    if_else(grepl(":climVal", term), "PFG x t", "PFG")))) %>% 
+    if_else(grepl(":Temp", term), "PFG x t", "PFG")))) %>% 
   arrange(desc(test, .by_group = TRUE))
 
 vegCompmod1plotCALL <- vegCompMaxmod1C %>% 
+  filter(!term %in% c("Temp")) %>% 
   ggplot(aes(x = term, y = estimate, ymin = lower, ymax = upper, fill = term2, shape = term2)) +
   geom_errorbar(width = 0, position = position_dodge(width = 0.5)) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_point(position = position_dodge(width = 0.5), size = 3) +
   scale_fill_manual(legend.title.climate, values = c("grey60", "white", "black")) +
   scale_shape_manual(legend.title.climate, values = c(21,24,23)) +
-  scale_x_discrete(limits = c("sunniness:moss cover", "moss cover:climVal", "moss cover", "sunniness:forbCov", "forbCov:climVal", "forbCov", "graminoidCov:sunniness", "graminoidCov:climVal", "graminoidCov"), labels = c("sunniness:moss cover" = "", "sunniness:forbCov" = "", "graminoidCov:sunniness" = "", "moss cover:climVal" = "bryophyte", "forbCov:climVal" = "forb", "graminoidCov:climVal" = "graminoid", "moss cover" = "", "forbCov" = "", "graminoidCov" = "")) +
+  scale_x_discrete(limits = c("sunniness:moss cover", "moss cover:Temp", "moss cover", "sunniness:forbCov", "forbCov:Temp", "forbCov", "graminoidCov:sunniness", "graminoidCov:Temp", "graminoidCov"), labels = c("sunniness:moss cover" = "", "sunniness:forbCov" = "", "graminoidCov:sunniness" = "", "moss cover:Temp" = "bryophyte", "forbCov:Temp" = "forb", "graminoidCov:Temp" = "graminoid", "moss cover" = "", "forbCov" = "", "graminoidCov" = "")) +
   #geom_vline(xintercept =  c(1.5, 2.5, 4.5, 5.5), colour = "grey90") +
   geom_vline(xintercept =  c(3.5, 6.5), colour = "grey90") +
   coord_flip() +
@@ -200,8 +189,7 @@ vegCompMaxmod1H <- modHeight %>%
   filter(!term == "(Intercept)", 
         !term == "scale(climVal)",
         !term == "sunniness") %>% 
-  filter(!grepl("^sd_", term),
-         climate == "Temp") %>% 
+  filter(!grepl("^sd_", term)) %>% 
   mutate(term = gsub("scale\\(|\\)", "", term),
          term = gsub("mossHeight", "moss height", term)) %>% 
   mutate(test = if_else(
@@ -210,17 +198,18 @@ vegCompMaxmod1H <- modHeight %>%
   )) %>%  
   mutate(term2 = if_else(grepl("sunniness:", term), "PFG x UV",
                          if_else(grepl(":sunniness", term), "PFG x UV",
-                                 if_else(grepl(":climVal", term), "PFG x t", "PFG")))) %>% 
+                                 if_else(grepl(":Temp", term), "PFG x t", "PFG")))) %>% 
   arrange(desc(test, .by_group = TRUE))
 
 vegCompmod1plotHALL <- vegCompMaxmod1H %>% 
+  filter(!term %in% c("Temp")) %>% 
   ggplot(aes(x = term, y = estimate, ymin = lower, ymax = upper, fill = term2, shape = term2)) +
   geom_errorbar(width = 0, position = position_dodge(width = 0.5)) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_point(position = position_dodge(width = 0.5), size = 3) +
   scale_fill_manual(legend.title.climate, values = c("grey60", "white", "black")) +
   scale_shape_manual(legend.title.climate, values = c(21,24,23)) +
-  scale_x_discrete(limits = c("sunniness:moss height", "moss height:climVal", "moss height", "vegetationHeight:sunniness", "vegetationHeight:climVal", "vegetationHeight"), labels = c("sunniness:moss height" = "", "vegetationHeight:sunniness" = "", "moss height:climVal" = "non-vascular", "vegetationHeight:climVal" = "vascular", "moss height" = "", "vegetationHeight" = "")) +
+  scale_x_discrete(limits = c("sunniness:moss height", "moss height:Temp", "moss height", "vegetationHeight:sunniness", "vegetationHeight:Temp", "vegetationHeight"), labels = c("sunniness:moss height" = "", "vegetationHeight:sunniness" = "", "moss height:Temp" = "non-vascular", "vegetationHeight:Temp" = "vascular", "moss height" = "", "vegetationHeight" = "")) +
   #geom_vline(xintercept =  c(1.5,3.5, 5.5, 6.5), colour = "grey90") +
   geom_vline(xintercept =  3.5, colour = "grey90") +
   coord_flip() +
@@ -260,6 +249,8 @@ vegCompmod1plotHZOOM <- vegCompMaxmod1H %>%
 
 ggsave(vegCompmod1plotHZOOM, file = "~/Documents/seedclimComm/figures/vegCompmodH2plotZOOM.jpg", dpi = 300, width = 6, height = 4)
 
+
+
 #########################################
 ######## TEMPERTAURE ANOMALIES ##########
 
@@ -272,15 +263,15 @@ maxminAnom <- maxmin %>%
 maxAnomPlot <- maxminAnom %>% 
   filter(!between(date, ymd("2015-09-01"), ymd("2016-05-31"))) %>%
   mutate(year = year(date)) %>% 
-  filter(weather %in% c("cloudy", "sunny")) %>% #, !Treatment %in% c("FGB", "B", "G", "F")
-  distinct(siteID, turfID, Treatment, Temp, Precip, maxAnom, sunniness, weather, Block) %>%
+  filter(weather == "sunny") %>% #, !Treatment %in% c("FGB", "B", "G", "F")
+  distinct(siteID, turfID, Treatment, Temp, Precip, maxAnom, sunniness, weather, Block, Temperature_level, Precipitation_level) %>%
   ggplot(aes(x = Treatment, y = maxAnom, colour = Treatment, fill = Treatment)) +
   geom_boxplot(alpha = 0.8) +
   #geom_bar(stat = "summary", alpha = 0.8) +
   scale_x_discrete(limits = c("GF", "GB", "FB", "G", "F", "B", "C"), labels = c("B", "F", "G", "FB", "GB", "GF", "FGB")) +
   scale_colour_manual("Functional groups",values = cbPalette[c(7,5,6,2,4,10,1)], limits = c("GF", "GB", "FB", "G", "F", "B", "C"), labels = c("Bryophytes", "Forbs","Graminoids", "Bryophytes and forbs", "Graminoids and bryophytes", "Forbs and graminoids", "Bryophytes, forbs \nand graminoids")) +
   scale_fill_manual("Functional groups", values = cbPalette[c(7,5,6,2,4,10,1)], limits = c("GF", "GB", "FB", "G", "F", "B", "C"), labels = c("Bryophytes", "Forbs","Graminoids", "Bryophytes and forbs", "Graminoids and bryophytes", "Forbs and graminoids", "Bryophytes, forbs \nand graminoids")) +
-  facet_grid(. ~ weather) +
+  facet_grid(.~ Precipitation_level) +
   geom_hline(yintercept = 0) +
   geom_vline(xintercept = 3.5, linetype = "dashed") +
   labs(y = "temperature anomaly from bare ground") +
@@ -297,10 +288,10 @@ coverPlot1 <- maxminAnom %>%
   gather(key = response, value = value, graminoidCov, vegetationHeight, forbCov, mossHeight, bryophyteCov) %>% 
   mutate(response = factor(response, levels = c("graminoidCov", "forbCov", "bryophyteCov", "vegetationHeight", "mossHeight"))) %>% 
   filter(response %in% c("graminoidCov", "forbCov", "bryophyteCov")) %>% 
-  ggplot(aes(x = value, y = maxAnom, colour = sunniness, fill = sunniness)) +
+  ggplot(aes(x = value, y = maxAnom)) +
   geom_smooth(method = "lm", se = TRUE) +
   geom_point() +
-  #stat_summary(geom = "point", fun.y = "mean", alpha = 0.7) +
+  stat_summary(geom = "point", fun.y = "mean", alpha = 0.7) +
   #scale_colour_manual(values = c("black", "grey60")) +
   #scale_fill_manual(values = c("black", "grey60")) +
   #facet_wrap( ~ Temperature_level, scales = "free_x") +
@@ -311,9 +302,9 @@ coverPlot1 <- maxminAnom %>%
 
 #ggsave(coverPlot1, file = "~/Documents/seedclimComm/figures/coverPlot2.jpg", dpi = 300, width = 9, height = 5)
 
-heightPlot1 <- maxminAnom %>% 
+heightPlot1 <- maxmin %>% 
   #filter(between(date, ymd("2015-08-01"), ymd("2015-09-30"))) %>%
-  filter(!Treatment == "FGB") %>% 
+  filter(Treatment %in% c("C", "B", "G", "F"), weather == "sunny") %>% 
   gather(key = response, value = value, bryophyteCov, graminoidCov, vegetationHeight) %>% 
   #filter(response %in% c("bryophyteCov"), value < 580) %>% 
   ggplot(aes(x = value, y = maxTemp, colour = Treatment, fill = Treatment, group = Treatment)) +
@@ -321,11 +312,16 @@ heightPlot1 <- maxminAnom %>%
   stat_summary(geom = "point", fun.y = "mean", alpha = 0.7) +
   scale_colour_manual("", values = cbPalette) +
   scale_fill_manual("", values = cbPalette) +
-  facet_wrap(response ~ weather, scales = "free_x") +
+  facet_grid(Temperature_level~response, scales = "free_x") +
   geom_hline(yintercept = 0, linetype = "dashed") +
   ylab("t") +
   xlab("vegetation height (mm)") +
   theme(axis.title.y = element_text(colour = "white"))
+
+
+maxmin %>% filter(Temperature_level == 6.5, maxTemp < 3) %>% View()
+
+
 
 #ggsave(heightPlot1, file = "~/Documents/seedclimComm/figures/heightPlot1.jpg", dpi = 300, width = 6, height = 4)
 legend <- get_legend(heightPlot1)

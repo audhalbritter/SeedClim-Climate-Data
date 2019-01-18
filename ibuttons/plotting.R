@@ -143,8 +143,5 @@ soilTemp %>%
   ggplot(aes(x = date, y = Value, colour = Block)) +
   geom_line()
 
-# need to check ibuttons that don't seem to be logging regularly. happens in several sites.
-
-
 
 # and we need to add figures to the .gitignore

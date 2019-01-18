@@ -1,6 +1,6 @@
 source("~/OneDrive - University of Bergen/Research/FunCaB/SeedclimComm/inst/graminoidRemovals/funcab_data_processing.R")
 
-load("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/soilTemp.RData")
+load("~/OneDrive - University of Bergen/Research/FunCaB/Data/soilTemp.RData")
 
 
 mossHeight <- composition %>% 
