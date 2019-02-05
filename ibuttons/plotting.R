@@ -59,7 +59,7 @@ alpine <- soilTemp %>%
   filter( weather %in% c("sunny", "cloudy"), between(date, ymd("2015-08-01"), ymd("2015-09-01")), Temperature_level == 6.5) %>% 
   ggplot(aes(x = hour, y = Value, colour = Treatment, linetype = weather)) +
   geom_smooth(se = FALSE, method = "loess") +
-  scale_colour_manual("Functional groups", values = c(cbPalette[3],"black", cbPalette[c(7,5,6,2,4,10,1)]), limits = c("temp200cm","FGB","GF", "GB", "FB", "G", "F", "B", "C"), labels = c("air 200cm","Bare ground","Bryophytes", "Forbs","Graminoids", "Bryophytes and forbs", "Graminoids and bryophytes", "Forbs and graminoids", "Bryophytes, forbs and\ngraminoids")) +
+  scale_colour_manual("Functional groups", values = c("black", cbPalette[c(7,5,6,2,4,3,1)]), limits = c("FGB","GF", "GB", "FB", "G", "F", "B", "C"), labels = c("Bare ground","Bryophytes", "Forbs","Graminoids", "Bryophytes and forbs", "Graminoids and bryophytes", "Forbs and graminoids", "Bryophytes, forbs and\ngraminoids")) +
   labs(x = "Time (hr)", y = "Soil temperature (ºC)") +
   #scale_linetype_manual(values = c("73",1)) +
   theme(plot.title = element_text(hjust = 0.5, size = 19)) +
@@ -80,12 +80,13 @@ FD <- soilTemp %>%
   mutate(sum = cumsum(x), n = n()) %>%
   ungroup()
 
-z <- FD %>% 
+x <- FD %>% 
   ggplot(aes(x = date, y = sum, colour = Treatment)) +
   stat_summary(fun.data = "mean_cl_boot", geom = "line", size = 0.8) +
   scale_x_discrete(limits = c("FGB", "GF", "GB", "FB", "G", "F", "B", "C"), labels = c("bare","B", "F", "G", "FB", "GB", "GF", "FGB")) +
-  scale_colour_manual("Vegetation", values = c("black", cbPalette[c(7,5,6,2,4,10,1)]), limits = c("FGB", "GF", "GB", "FB", "G", "F", "B", "C")) +
-  scale_fill_manual("Vegetation", values = c("black", cbPalette[c(7,5,6,2,4,10,1)]), limits = c("FGB", "GF", "GB", "FB", "G", "F", "B", "C")) +
+  scale_colour_manual("Vegetation", values = c("black", cbPalette[c(7,5,6,2,4,3,1)]), limits = c("FGB", "GF", "GB", "FB", "G", "F", "B", "C")) +
+  scale_fill_manual("Vegetation", values = c("black", cbPalette[c(7,5,6,2,4,3,1)]), limits = c("FGB", "GF", "GB", "FB", "G", "F", "B", "C")) +
+  coord_cartesian(ylim = c(0, 85)) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   axis.dimLarge +
   ylab("Cumulative frost\ndays") +
@@ -104,18 +105,18 @@ y <- soilTemp %>%
   ggplot(aes(x = date, y = meanTemp, colour = Treatment)) +
   geom_line(size = 0.8, alpha = 0.9) +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  scale_colour_manual("Functional groups", values = c("black", cbPalette[c(7,5,6,2,4,10,1)]), limits = c("FGB","GF", "GB", "FB", "G", "F", "B", "C"), labels = c("Bare ground","Bryophytes", "Forbs","Graminoids", "Bryophytes & forbs", "Graminoids & bryophytes", "Forbs & graminoids", "Bryophytes, forbs &\ngraminoids")) +
+  scale_colour_manual("Functional groups", values = c("black", cbPalette[c(7,5,6,2,4,3,1)]), limits = c("FGB","GF", "GB", "FB", "G", "F", "B", "C"), labels = c("Bare ground","Bryophytes", "Forbs","Graminoids", "Bryophytes & forbs", "Graminoids & bryophytes", "Forbs & graminoids", "Bryophytes, forbs &\ngraminoids")) +
   ylab("Soil temperature (°C)") +
   axis.dimLarge +
   theme(axis.title=element_text(size=15),
         axis.title.x = element_blank())
 
-legend <- get_legend(lav)
-z <- plot_grid(y + theme(legend.position = "none"), x, ncol = 1, rel_heights = c(1.65, 1), align = "hv", labels = c("A", "B"), label_x = 0.1, label_y = 0.95)
+legend <- get_legend(alpine)
+z <- plot_grid(y + theme(legend.position = "none"), x, ncol = 1, rel_heights = c(1.65, 1), align = "hv", labels = c("B", "C"), label_x = 0.055, label_y = 0.97)
 #eps <- plot_grid(legend, lav, ncol = 1, rel_heights = c(1,1.65))
 
-frostSumAnn <- plot_grid(z, lav + theme(legend.position = "none"), legend, nrow = 1, rel_widths = c(1, 0.75, 0.45), labels = "C", label_x = 1.02, label_y =0.97)
-ggsave(frostSumAnn, filename = "~/Documents/seedclimComm/figures/frostSumAnn2.jpg", dpi = 300, width = 11.5, height = 4.55)
+frostSumAnn <- plot_grid(alpine + theme(legend.position = "none"), z, legend, nrow = 1, rel_widths = c(0.95, 1, 0.49), labels = "A", label_x = 0.02, label_y =0.97)
+ggsave(frostSumAnn, filename = "~/OneDrive - University of Bergen/Research/FunCaB/paper 2/figures/fig1.jpg", dpi = 300, width = 12.5, height = 5)
 
 
 soilTemp %>% filter(format(Date, "%Y-%m") == "2015-09") %>%
