@@ -1,5 +1,5 @@
 #### community composition data ####
-load(file = "/Volumes/fja062/PhD/Data/funcab/funcabCompDataWithTTCs.RData")
+load(file = "~/Volumes/fja062/PhD/Data/funcab/funcabCompDataWithTTCs.RData")
 
 ## ---- Traits.data.import ---- 
 

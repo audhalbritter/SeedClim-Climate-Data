@@ -124,15 +124,6 @@ Cover <- maxminANALYSIS %>%
          svegetationHeight = scale(vegetationHeight),
          smossHeight = scale(mossHeight))
 
-scalars <- Cover %>% 
-  select(sTemp, sgraminoidCov, sforbCov, sbryophyteCov, ssunniness, smossHeight, svegetationHeight) %>% 
-  map(attributes) %>% 
-  map(unlist) %>% 
-  as.data.frame() %>% 
-  t() %>% 
-  as.data.frame() %>% 
-  select(-c(dim1, dim2))
-
 Cover <- Cover %>% 
   distinct(graminoidCov, forbCov, bryophyteCov, vegetationHeight, mossHeight, siteID, turfID, Treatment, Temp, maxTemp, sunniness, Precip, Block, Temperature_level) %>%
   na.omit()
@@ -155,133 +146,6 @@ coefsModCov <- modCover %>%
          upper = (estimate + std.error*1.96)) %>%
   as.data.frame()
 
-
-Cover$modPreds <- predict(modCover, re.form = ~1|siteID/Block)
-
-
-# predictions for vegetation AND climate warming
-gramLM <- Cover %>%
-  filter(Treatment == "C") %>%
-  distinct(turfID, .keep_all = TRUE) %>%
-  lm(graminoidCov ~ Temp, data = .)
-
-bryoLM <- Cover %>%
-  filter(Treatment == "C") %>%
-  distinct(turfID, .keep_all = TRUE) %>%
-  lm(bryophyteCov ~ Temp, data = .)
-
-forbLM <- Cover %>%
-  filter(Treatment == "C") %>%
-  distinct(turfID, .keep_all = TRUE) %>%
-  lm(forbCov ~ Temp, data = .)
-
-vegHeightLM <- Cover %>% 
-  filter(Treatment == "C") %>%
-  distinct(turfID, .keep_all = TRUE) %>%
-  lm(vegetationHeight ~ Temp, data = .)
-
-mossHeightLM <- Cover %>% 
-  filter(Treatment == "C") %>%
-  distinct(turfID, .keep_all = TRUE) %>%
-  lm(mossHeight ~ Temp, data = .)
-
-# predictions for climate warming ONLY
-P45 <- Cover %>% 
-  mutate(Temp = Temp + 2.3)
-P85 <- Cover %>% 
-  mutate(Temp = Temp + 3.9)
-
-Cover$P45 <-  predict(modCover, newdata = P45, re.form = ~1|siteID/Block)
-Cover$P85 <-  predict(modCover, newdata = P85, re.form = ~1|siteID/Block)
-
-# predictions for sunshine ONLY
-modSun <- Cover %>% 
-  mutate(sunniness = sunniness*0.9)
-
-Cover$modSun <-  predict(modCover, newdata = P45s, re.form = ~1|siteID/Block)
-
-# predictions for sunshine + temperature
-P45ts <- Cover %>% 
-  mutate(sunniness = sunniness*0.9,
-         Temp = Temp + 2.3)
-P85ts <- Cover %>% 
-  mutate(sunniness = sunniness*0.9,
-         Temp = Temp + 3.9)
-
-Cover$P45ts <-  predict(modCover, newdata = P45ts, re.form = ~1|siteID/Block)
-Cover$P85ts <-  predict(modCover, newdata = P85ts, re.form = ~1|siteID/Block)
-
-# temperature + bryophytes
-P45CovB <- Cover %>% 
-  mutate(Temp = Temp + 2.3,
-         bryophyteCov = bryophyteCov + 1.852)
-P85CovB <- Cover %>% 
-  mutate(Temp = Temp + 3.9,
-         bryophyteCov = bryophyteCov + 1.852)
-
-Cover$P45CovB <-  predict(modCover, newdata = P45CovB, re.form = ~1|siteID/Block)
-Cover$P85CovB <-  predict(modCover, newdata = P85CovB, re.form = ~1|siteID/Block)
-
-# temperature + sunshine + bryophytes
-P45CovBs <- Cover %>% 
-  mutate(Temp = Temp + 2.3,
-         sunniness = sunniness*0.9,
-         bryophyteCov = bryophyteCov + 1.852)
-P85CovBs <- Cover %>% 
-  mutate(Temp = Temp + 3.9,
-         sunniness = sunniness*0.9,
-         bryophyteCov = bryophyteCov + 1.852)
-
-Cover$P45CovBs <-  predict(modCover, newdata = P45CovBs, re.form = ~1|siteID/Block)
-Cover$P85CovBs <-  predict(modCover, newdata = P85CovBs, re.form = ~1|siteID/Block)
-
-# temperature + graminoids
-P45CovG <- Cover %>% 
-  mutate(Temp = Temp + 2.3,
-         graminoidCov = graminoidCov + 3.387)
-
-P85CovG <- Cover %>% 
-  mutate(Temp = Temp + 3.9,
-         graminoidCov = graminoidCov + 3.387)
-
-Cover$P45CovG <-  predict(modCover, newdata = P45CovG, re.form = ~1|siteID/Block)
-Cover$P85CovG <-  predict(modCover, newdata = P85CovG, re.form = ~1|siteID/Block)
-
-
-# temperature + bryophytes + graminoids
-P45CovGB <- Cover %>% 
-  mutate(Temp = Temp + 2.3,
-         bryophyteCov = bryophyteCov + 1.852,
-         graminoidCov = graminoidCov + 3.387)
-
-P85CovGB <- Cover %>% 
-  mutate(Temp = Temp + 3.9,
-         bryophyteCov = bryophyteCov + 1.852,
-         graminoidCov = graminoidCov + 3.387)
-
-Cover$P45CovGB <-  predict(modCover, newdata = P45CovGB, re.form = ~1|siteID/Block)
-Cover$P85CovGB <-  predict(modCover, newdata = P85CovGB, re.form = ~1|siteID/Block)
-
-
-P45CovVLS <- Cover %>% 
-  mutate(Temp = Temp + 2.3,
-         bryophyteCov = bryophyteCov + 1.852,
-         graminoidCov = graminoidCov + 3.387,
-         forbCov = forbCov - 0.7138,
-         mossHeight = mossHeight + 2.7823,
-         vegetationHeight = vegetationHeight + 21.04,
-         sunniness = sunniness*0.9)
-
-# model scenarios
-predictions <- Cover %>% gather(maxTemp, modPreds,modSun, P45, P85, P45ts, P85ts, P45CovB, P85CovB, P45CovBs, P85CovBs, key = Model, value = value) %>% 
-  gather(graminoidCov, forbCov, bryophyteCov, key = vegetationCov, value = cov) %>% 
-  filter(Treatment == "C", Temperature_level == 6.5) %>% 
-  ggplot(aes(x = Model, y = value)) +
-  geom_boxplot() +
-  theme(axis.text.x = element_text(angle = 90)) +
-  geom_vline(xintercept = c(3.5, 7.5), linetype = "dashed", colour = "grey60")
-  #stat_summary(fun.y = mean, geom = "boxplot", size = 1)
-ggsave(predictions, filename = "~/OneDrive - University of Bergen/Research/FunCaB/paper 2/figures/predictions.jpg", dpi = 300, width = 9, height = 6)
 
 vegCompMaxmod1C <- coefsModCov %>% 
   filter(!term == "(Intercept)") %>% 
@@ -437,6 +301,55 @@ vegCompMaxmod1HUVt <- vegCompMaxmod1HUVt %>%
 ggsave(vegCompMaxmod1HUVt, file = "~/OneDrive - University of Bergen/Research/FunCaB/paper 2/figures/supFig4.jpg", dpi = 300, width = 6, height = 4)
 
 
+########################################
+########## soil freezing ###############
+
+climate <- maxmin %>% 
+  select(siteID, Temperature_level, Precipitation_level, Temp, Precip)
+
+FD <- vegComp %>%
+  ungroup() %>% 
+  filter(between(date, ymd("2015-07-15"), ymd("2016-06-29")), !Treatment == "temp200cm", !is.na(Value)) %>%
+  mutate(Treatment = recode(Treatment, "FGB" = "aFGB")) %>% 
+  filter(Treatment %in% c("C", "aFGB", "GB", "GF", "FB")) %>% 
+  #filter(!turfID %in% c("Lav1GF", "Lav4GF", "Lav2GF")) %>% 
+  group_by(date, Treatment, siteID, Temperature_level, Precipitation_level, blockID) %>% 
+  summarise(minTemp = min(Value)) %>% 
+  mutate(x = minTemp < 0) %>%
+  arrange(date) %>% 
+  group_by(Treatment, siteID) %>% 
+  mutate(sum = cumsum(x), n = n()) %>%
+  ungroup() %>% 
+  filter(date == ymd("2016-05-30")) %>% 
+  left_join(climate) %>% 
+  distinct(Treatment, siteID, Temperature_level, Precipitation_level, blockID, sum, Temp, Precip) %>% 
+  na.omit()
+
+modFD <- lmer(sum ~ Treatment*scale(Temp)*scale(Precip) + (1|blockID), REML = FALSE, data = FD)
+
+P85 <- FD %>% mutate(Precip = Precip*1.17)
+t85 <- FD %>% mutate(Temp = Temp + 3.9)
+tP85 <- FD %>% mutate(Temp = Temp + 3.9,
+                         Precip = Precip*1.17)
+
+FD$modPreds <- predict(modFD, re.form = ~1|blockID)
+FD$P85 <-  predict(modFD, newdata = P85, re.form = ~1|blockID)
+FD$t85 <-  predict(modFD, newdata = t85, re.form = ~1|blockID)
+FD$tP85 <-  predict(modFD, newdata = tP85, re.form = ~1|blockID)
+
+pal1 <- wes_palette(7, name = "Darjeeling2", type = "continuous")
+
+FD %>% gather(sum, modPreds, P85, t85, tP85, key = Model, value = value) %>% 
+  ggplot(aes(x = Temperature_level, y = value, colour = Treatment)) +
+  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = 0.6)) +
+  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = 0.6), geom = "line") +
+  facet_grid(.~Model) +
+  scale_color_manual(values = pal1) +
+  geom_hline(yintercept = 0, colour = "grey60")
+
+#ggsave(maxTempPredictions, filename = "~/OneDrive - University of Bergen/Research/FunCaB/paper 2/figures/maxTempPredictions.jpg", dpi = 300, width = 13, height = 6)
+
+
 
 #########################################
 ######## TEMPERTAURE ANOMALIES ##########
@@ -509,17 +422,6 @@ heightPlot1 <- maxmin %>%
 maxmin %>% filter(Temperature_level == 6.5, maxTemp < 3) %>% View()
 
 
-
-#ggsave(heightPlot1, file = "~/Documents/seedclimComm/figures/heightPlot1.jpg", dpi = 300, width = 6, height = 4)
-legend <- get_legend(heightPlot1)
-
-xplot <- plot_grid(vegCompmod1plotC, coverPlot1 + theme(legend.position = "none"), vegCompmod1plotH, heightPlot1  + theme(legend.position = "none"), labels = c("A", "B", "C", "D"), rel_widths = c(0.83, 0.95))
-
-
-coverPlot1grid <- plot_grid(xplot, legend, rel_widths = c(3, 0.3))
-
-ggsave(coverPlot1grid, file = "~/Documents/seedclimComm/figures/responsePlotGrid1Temp.jpg", dpi = 300, width = 9, height = 7)
-
 # sum of degrees above 0 in August, September and October
 DDsum <- vegComp %>% 
   distinct(turfID, date, TOD, Value, .keep_all = TRUE) %>% 
@@ -550,8 +452,8 @@ frostDayMod <- frostDayMod %>%
   group_by(turfID, Treatment, Block, siteID) %>%
   left_join(frostDayMod %>% filter(Treatment == "FGB") %>% ungroup() %>% select(FGBsum = sum, date, siteID, Block)) %>%
   mutate(sumAnom = sum - FGBsum) %>% 
-  ungroup() %>% 
-  filter(date == "2016-05-30")
+  ungroup() #%>% 
+  #filter(date == "2016-05-30")
 
 x <- frostDayMod %>% 
   filter(!Treatment == "temp200cm", siteID == "Lavisdalen") %>% #work in progress
@@ -745,3 +647,57 @@ minTempPredictions <- treatmin %>% gather(minTemp, modPreds, modSun, P85, t85, t
   scale_color_manual(values = pal1)
 
 ggsave(minTempPredictions, filename = "~/OneDrive - University of Bergen/Research/FunCaB/paper 2/figures/minTempPredictions.jpg", dpi = 300, width = 13, height = 6)
+
+
+#### temperature amplitude ####
+treat <- maxminANALYSIS %>% 
+  ungroup() %>% 
+  mutate(tempAmp = maxTemp - minTemp,
+         Year = year(date),
+         Treatment = recode(Treatment, "FGB" = "aFGB"),
+         sTemp = scale(Temp),
+         ssunniness = scale(sunniness)) %>% 
+  distinct(siteID, turfID, Treatment, tempAmp, Temp, maxTemp, minTemp, sunniness, Precip, Block, Temperature_level) %>%
+  filter(Treatment %in% c("aFGB", "C", "FB", "GB", "GF")) %>% 
+  na.omit()
+
+modTreat <- lmer(tempAmp ~ Treatment*scale(sunniness) + 
+                   Treatment*scale(Temp) + 
+                   Treatment*scale(Precip) +
+                   (1|siteID/Block), REML = FALSE, data = treat)
+
+P85 <- treat %>% mutate(Precip = Precip*1.17)
+t85 <- treat %>% mutate(Temp = Temp + 3.9)
+modSun <- treat %>% mutate(sunniness = sunniness*0.9)
+tP85 <- treat %>% mutate(Temp = Temp + 3.9,
+                         Precip = Precip*1.17)
+tPSun85 <- treat %>% mutate(Temp = Temp + 3.9,
+                            Precip = Precip*1.17,
+                            sunniness = sunniness*0.9)
+
+treat$modPreds <- predict(modTreat, re.form = ~1|siteID/Block)
+treat$P85 <-  predict(modTreat, newdata = P85, re.form = ~1|siteID/Block)
+treat$t85 <-  predict(modTreat, newdata = t85, re.form = ~1|siteID/Block)
+treat$tP85 <-  predict(modTreat, newdata = tP85, re.form = ~1|siteID/Block)
+treat$modSun <-  predict(modTreat, newdata = modSun, re.form = ~1|siteID/Block)
+treat$tPSun85 <-  predict(modTreat, newdata = tPSun85, re.form = ~1|siteID/Block)
+
+# single remainers, plus sunnines*temp
+treat %>% gather(tempAmp, modPreds, modSun, P85, t85, tP85, tPSun85, key = Model, value = value) %>% 
+  #filter(Temperature_level == 6.5) %>% 
+  ggplot(aes(x = Treatment, y = value)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  #geom_vline(xintercept = c(3.5, 7.5), linetype = "dashed", colour = "grey60") +
+  facet_grid(Temperature_level~Model)
+#stat_summary(fun.y = mean, geom = "boxplot", size = 1)
+
+pal1 <- wes_palette(7, name = "Darjeeling2", type = "continuous")
+
+tempAmpPredictions <- treat %>% gather(tempAmp, modPreds, modSun, P85, t85, tP85, tPSun85, key = Model, value = value) %>% 
+  ggplot(aes(x = Temperature_level, y = value, colour = Treatment)) +
+  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = 0.6)) +
+  stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = 0.6), geom = "line") +
+  facet_grid(.~Model) +
+  scale_color_manual(values = pal1)
+ggsave(tempAmpPredictions, filename = "~/OneDrive - University of Bergen/Research/FunCaB/paper 2/figures/maxTempPredictions.jpg", dpi = 300, width = 13, height = 6)

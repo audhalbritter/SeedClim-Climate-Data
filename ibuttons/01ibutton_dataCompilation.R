@@ -69,10 +69,6 @@ maxmin <- maxmin %>%
   mutate(Temp = recode(siteID, Ulvhaugen=6.17, Lavisdalen =6.45, Gudmedalen =5.87, Skjellingahaugen =6.58, Alrust =9.14, Hogsete =9.17, Rambera =8.77, Veskre =8.67, Fauske =10.3, Vikesland =10.55, Arhelleren =10.60, Ovstedal=10.78),
          Precip= recode(siteID, Ulvhaugen =596, Lavisdalen =1321, Gudmedalen =1925, Skjellingahaugen =2725, Alrust =789, Hogsete =1356, Rambera =1848, Veskre =3029, Fauske =600, Vikesland =1161, Arhelleren =2044, Ovstedal=2923))
 
-# filter for 1st July - 31st August for analyses
-maxminANALYSIS <- maxmin %>% 
-  filter(between(date, left = dmy("01-07-2015"), right = dmy("31-08-2015")))
-
 maxmin %>% 
   filter(between(date, left = dmy("01-06-2016"), right = dmy("31-08-2016"))) %>% 
   group_by(turfID, date) %>% 
