@@ -44,7 +44,7 @@ dict_TTC_turf <- read_delim(delim = ";", file =
 
 #use soil moisture differences!
 # read in soil moisture data FUNCAB point measurements
-SM201516 <- read_excel("~/OneDrive - University of Bergen/Research/FunCaB/Data/iButton2016-2017_clean.xlsx")
+SM201516 <- read_excel("~/OneDrive - University of Bergen/Research/FunCaB/Data/soilMoisture_2015-2016.xlsx")
 #SM2017 <- read_excel(path = "/Volumes/fja062/PhD/Data/Soilmoisture2017.xlsx")
 
 SM201516 <- SM201516 %>% 
@@ -79,7 +79,7 @@ save(SM201516, file = "~/OneDrive - University of Bergen/Research/FunCaB/Data/so
 
 SM201516 <- SM201516 %>% 
   filter(date > ymd("2016-01-01")) %>% 
-  select(-comments, -sameDayMeasurement) %>% 
+  select(-sameDayMeasurement) %>% 
   group_by(date, turfID, Treatment, block, weather, siteID) %>% 
   left_join(SM201516 %>% filter(Treatment == "FGB") %>% ungroup() %>% select(FGBSM = SM, date, block, siteID)) %>%
   mutate(SMAnom = SM - FGBSM) %>% 

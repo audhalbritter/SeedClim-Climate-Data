@@ -83,3 +83,10 @@ maxminTEST <- maxmin %>%
   facet_wrap(~siteID)
 
 save(maxmin, file = "~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/ibuttons/maxmin.RData")
+
+
+# --- temperature anomalies ---#
+maxminAnom <- maxmin %>% 
+  left_join(maxmin %>% filter(Treatment == "FGB") %>% ungroup() %>% select(FGBmaxTemp = maxTemp, date, siteID, Block)) %>%
+  mutate(maxAnom = maxTemp - FGBmaxTemp) %>% 
+  ungroup()

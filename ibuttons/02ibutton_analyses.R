@@ -354,11 +354,6 @@ FD %>% gather(sum, modPreds, P85, t85, tP85, key = Model, value = value) %>%
 #########################################
 ######## TEMPERTAURE ANOMALIES ##########
 
-maxminAnom <- maxmin %>% 
-  left_join(maxmin %>% filter(Treatment == "FGB") %>% ungroup() %>% select(FGBmaxTemp = maxTemp, date, siteID, Block)) %>%
-  mutate(maxAnom = maxTemp - FGBmaxTemp) %>% 
-  ungroup()
-
 #treatment
 maxAnomPlot <- maxminAnom %>% 
   filter(!between(date, ymd("2015-09-01"), ymd("2016-05-31"))) %>%
