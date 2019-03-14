@@ -49,31 +49,31 @@ community_FD <- community_FD %>%
             Wvar_Height = wt.var(logHeight, cover),
             Wvar_C = wt.var(C, cover),
             Wvar_N = wt.var(N, cover),
-            Wvar_CN = wt.var(CN, cover),
-            Wkur_LDMC= weighted_kurtosis(LDMC, cover),
-            Wkur_Lth = weighted_kurtosis(Lth, cover),
-            Wkur_LA  = weighted_kurtosis(sqrtLA, cover),
-            Wkur_SLA = weighted_kurtosis(SLA, cover),
-            Wkur_Height = weighted_kurtosis(logHeight, cover),
-            Wkur_C = weighted_kurtosis(C, cover),
-            Wkur_N = weighted_kurtosis(N, cover),
-            Wkur_CN = weighted_kurtosis(CN, cover)) %>%
+            Wvar_CN = wt.var(CN, cover)) %>% 
+            #Wkur_LDMC= weighted_kurtosis(LDMC, cover),
+            #Wkur_Lth = weighted_kurtosis(Lth, cover),
+            #Wkur_LA  = weighted_kurtosis(sqrtLA, cover),
+            #Wkur_SLA = weighted_kurtosis(SLA, cover),
+            #Wkur_Height = weighted_kurtosis(logHeight, cover),
+            #Wkur_C = weighted_kurtosis(C, cover),
+            #Wkur_N = weighted_kurtosis(N, cover),
+            #Wkur_CN = weighted_kurtosis(CN, cover)) %>%
   #gather(key= Trait, value= value, -c(turfID:Year))%>%
   ungroup()
 
 # gather traits
 community_FD <- community_FD %>% 
   #filter(Treatment %in% c("C", "FGB", "GF", "GB", "FB")) %>% 
-  gather(c(sumcover:Wkur_CN), key = "trait", value = "value")
+  gather(c(sumcover:Wvar_CN), key = "trait", value = "value")
 
 
-#--------- analyses --------------#
+#------------ analyses ---------------#
 #load packages
 library(lme4)
 library(MuMIn)
 library(GGally)
-library(tibble)
 library(broom)
+library(broom.mixed)
 
 # Scaling explanatory variables
 # relevel treatment so that TTC is the intercept
@@ -82,21 +82,28 @@ community_FD_analysis <- community_FD %>%
          Stemp0916 = as.numeric(scale(temp0916))) %>% 
   mutate(Treatment = factor(Treatment, levels = c("C", "FGB", "GF", "GB", "FB", "G", "F", "B"))) %>% 
   group_by(trait, functionalGroup) %>% 
-  mutate(value = scale(value)) %>% 
-  filter(!is.na(value), !is.infinite(value))
+  mutate(value = if_else(trait == "richness", value, scale(value))) %>%
+  filter(is.finite(value))
 
+#model of effect of graminoids and response of forbs
 mod1temp <- community_FD_analysis %>% 
   filter(Treatment %in% c("C", "G", "B", "GB"), functionalGroup == "forb") %>% 
+  mutate(traitII = trait) %>% 
   group_by(trait) %>%
-  do({
+  do({if(.$traitII[1] == "richness"){
+    mod <- glmer(value ~ Treatment*Stemp0916*Sprecip0916 + (1|siteID/blockID), family = "poisson", data = .)
+  } else {
     mod <- lmer(value ~ Treatment*Stemp0916*Sprecip0916 + (1|siteID/blockID), REML = FALSE, data = .)
+    }
     tidy(mod)}) %>% 
   #filter(term %in% c("TTtreatRTC","TTtreatRTC:Stemp0916:SYear", "TTtreatRTC:Sprecip0916:SYear", "TTtreatRTC:SYear")) %>% 
   arrange(desc(trait)) %>% 
   mutate(lower = (estimate - std.error*1.96),
          upper = (estimate + std.error*1.96)) %>% 
-  ungroup()
+  ungroup() %>% 
+  mutate(term = paste0("G", term))
 
+# model of effect of forbs and response of graminoids
 mod2temp <- community_FD_analysis %>% 
   filter(Treatment %in% c("C", "F", "B", "FB"), functionalGroup == "graminoid") %>% 
   group_by(trait) %>%
@@ -107,15 +114,22 @@ mod2temp <- community_FD_analysis %>%
   arrange(desc(trait)) %>% 
   mutate(lower = (estimate - std.error*1.96),
          upper = (estimate + std.error*1.96)) %>% 
-  ungroup()
+  ungroup() %>% 
+  mutate(term = paste0("F", term))
 
 
+mods <- bind_rows(mod1temp, mod2temp)
+write_csv(mods, path = "~/OneDrive - University of Bergen/Research/FunCaB/paper 3/mods.csv")
 
+Glancemod1temp <- community_FD_analysis %>% 
+  filter(Treatment %in% c("C", "G", "B", "GB"), functionalGroup == "forb") %>% 
+  nest(-trait) %>%
+  mutate(fit = map(data, ~ lmer(value ~ Treatment*Stemp0916*Sprecip0916 + (1|siteID/blockID), REML = FALSE, data = .)),
+         results = map(fit, glance)) %>% 
+  unnest(results)
+  
 
-
-
-
-
+#------------ PLOTTING --------------#
 # source plotting colours etc
 source("~/OneDrive - University of Bergen/Research/FunCaB/SeedclimComm/inst/graminoidRemovals/plotting_dim.R")
 
@@ -136,7 +150,6 @@ community_cover %>%
   group_by(turfID, siteID, FG) %>% 
   left_join(community_cover %>% filter(Treatment == "C") %>% ungroup() %>% select(Cvalue = value, siteID, blockID, trait))
 
-#------------ PLOTTING --------------
 community_FDPlot %>% ggplot(aes(x = tempLevel, y = valueAnom, colour = Treatment, linetype)) +
   stat_summary(fun.data = "mean_cl_boot", size = 0.8, position = position_dodge(0.5)) +
   #stat_summary(fun.data = "mean_cl_boot", geom = "line", size = 0.8) +
