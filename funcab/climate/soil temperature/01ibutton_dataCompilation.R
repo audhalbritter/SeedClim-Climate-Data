@@ -1,14 +1,16 @@
-source("~/OneDrive - University of Bergen/Research/FunCaB/SeedclimComm/inst/graminoidRemovals/funcab_data_processing.R")
+# load libraries
+library(lubridate)
+
+source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/funcab/vegetation/00funcab_data_processing.R")
 
 load("~/OneDrive - University of Bergen/Research/FunCaB/Data/soilTemp.RData")
-load("~/OneDrive - University of Bergen/Research/FunCaB/Data/vegComp.RData")
 
 
-mossHeight <- composition %>% 
+mossHeight <- comp2 %>% 
   filter(Year == 2017) %>% 
   select(turfID, Treatment, mossHeight, bryophyteCov)
 
-composition2015 <- composition %>% 
+composition2015 <- comp2 %>% 
   filter(Year == 2015, !is.na(Treatment), !Treatment == "XC")
 
 vegComp <- soilTemp %>%

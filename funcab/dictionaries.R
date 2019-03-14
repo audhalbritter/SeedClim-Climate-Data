@@ -1,18 +1,18 @@
 # dictionaries
 dict_Site <- read_delim(delim = " ", file = 
-"old v2 new
-Arh ARH Arhelleren
-Ovs OVS Ovstedal
-Ves VES Veskre
-Skj SKJ Skjellingahaugen
-Lav LAV Lavisdalen
-Gud GUD Gudmedalen
-Ulv ULV Ulvhaugen
-Vik VIK Vikesland
-Hog HOG Hogsete
-Alr ALR Alrust
-Fau FAU Fauske
-Ram RAM Rambera")
+"old v2 v3 new
+Arh ARH arh Arhelleren
+Ovs OVS ovs Ovstedal
+Ves VES ves Veskre
+Skj SKJ skj Skjellingahaugen
+Lav LAV lav Lavisdalen
+Gud GUD gud Gudmedalen
+Ulv ULV ulv Ulvhaugen
+Vik VIK vik Vikesland
+Hog HOG hog Hogsete
+Alr ALR alr Alrust
+Fau FAU fau Fauske
+Ram RAM ram Rambera")
 
 
 sitePref <- read_delim(delim = " ", file = 
@@ -46,6 +46,7 @@ dict_TTC_turf <- read_delim(delim = ";", file =
 73 TTC;Fau5C
 29 TTC;Alr1C
 31 TTC;Alr2C
+37 TTC;Alr3C
 134 TTC;Vik2C
 140 TTC;Vik3C
 141 TTC;Vik4C

@@ -1,117 +1,122 @@
-composition <- composition %>% 
-  filter(!Treatment == "XC")
+# source species composition compilation
+source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/funcab/vegetation/00funcab_data_processing.R")
 
-#### Load trait data ####
+# source trait imputation
+source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/funcab/vegetation/trait_imputation.R")
 
-# compile CWM an Fdiv trait values
-# load imputation files for each traits for all species
+# source plotting code
+source("~/OneDrive - University of Bergen/Research/FunCaB/SeedclimComm/inst/graminoidRemovals/plotting_dim.R")
 
-trait_C <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_C.csv", header =TRUE, sep = ";", dec = ",") %>%
-  mutate(Species = paste0(Site, "_", Species)) %>%
-  select( Site, Species, predictValue, predictionSE) #, predictionSE
-trait_N <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_N.csv", header =TRUE, sep = ";", dec = ",") %>%
-  select(predictValue, predictionSE)
-trait_CN <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_CN.ratio.csv", header =TRUE, sep = ";", dec = ",") %>%
-  select(predictValue, predictionSE)
-trait_SLA <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_SLA.csv", header =TRUE, sep = ";", dec = ",") %>%
-  select(predictValue, predictionSE)
-trait_Lth <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_Lth_ave.csv", header =TRUE, sep = ";", dec = ",") %>%
-  select(predictValue, predictionSE)
-trait_LDMC <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_LDMC.csv", header =TRUE, sep = ";", dec = ",") %>%
-  select(predictValue, predictionSE)
-trait_logLA <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_logLA.csv", header =TRUE, sep = ";", dec = ",") %>%
-  select(predictValue, predictionSE)
-trait_logHeight <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_logHeight.csv", header =TRUE, sep = ";", dec = ",") %>%
-  select(predictValue, predictionSE)
+# load packages
+library("vegan")
+library("ggvegan")
 
-Species_traits <-bind_cols(trait_C, trait_N, trait_CN, trait_SLA,
-                           trait_Lth, trait_LDMC, trait_logLA, trait_logHeight)%>%
-  rename(C = predictValue, N = predictValue1, CN = predictValue2, SLA =
-           predictValue3, Lth = predictValue4, LDMC = predictValue5, LA =
-           predictValue6, Height = predictValue7)
-
-## check distribution of imputation values of traits
-ggplot(Species_traits, aes(SLA)) +
-  geom_density() +
-  facet_wrap(~Site)
-## Distribution of imputed values within range of measured traits
-
-## Checked SE values for each trait- Emp_nig, Emp_her, Ver_alp and Sil_vul very large SE remove from dataset
-Species_traits <- Species_traits %>%
-  filter(!grepl("Emp_",  Species))%>%
-  filter(!grepl("Ver_alp",  Species))%>%
-  filter(!grepl("Sil_vul",  Species)) %>% 
-  mutate(Site = plyr::mapvalues(Site, from = dict_Site$old, to = dict_Site$new)) %>%
-  select(siteID = Site, speciesID = Species, C, N, CN, SLA, Lth, LDMC, LA, Height) %>% 
-  mutate(speciesID = substr(speciesID, 5, n()),
-         speciesID = gsub("_", ".", speciesID),
-         speciesID = paste0(siteID, "_", speciesID))
-  
-
+# create grouping variable before merge
+community_cover_1516 <- comp2 %>%
+  mutate(speciesID = paste0(siteID,"_", species))
 
 # calculation of CWM and FDvar; Community weighted mean and community-weighted variance of trait values
 # join imputed traits with species cover
 # wt.var() calculate weighted variance
 
-community_cover_1516 <- composition %>%
-  mutate(speciesID = paste0(siteID,"_", species))
 
+# merge traits with community data, and filter for treatment
 community_FD <- left_join(community_cover_1516, Species_traits, by = c("speciesID", "siteID")) %>%
-  select(siteID, turfID, Year, species, functionalGroup, cover, C, N, CN, SLA, Lth, LDMC, LA, Height) %>%
-  group_by(turfID, siteID, Year) %>%
-  filter(!is.na(cover)) %>%
+  select(siteID, Treatment, turfID, Year, species, functionalGroup, cover, C, N, CN, SLA, Lth, LDMC, sqrtLA, logHeight) %>%
+  filter(!is.na(cover), Treatment %in% c("C", "XC"), cover > 0) %>% 
+  filter(!turfID == "Lav1XC") # must fix - this is a problem in 2016 where Eric often didn't record cover
+
+
+# calculate community weighted means and variances
+community_FD <- community_FD %>% 
+  group_by(siteID, turfID, Year) %>%
   mutate(richness = sum(n_distinct(species))) %>%
   mutate(diversity = diversity(cover, index = "shannon")) %>%
-  mutate(evenness = (diversity/log(richness)))%>%
+  mutate(evenness = (diversity/log(richness))) %>% 
   summarize(richness = mean(richness),
             diversity = mean(diversity),
             evenness = mean(evenness),
             Wmean_LDMC= weighted.mean(LDMC, cover, na.rm=TRUE),
             Wmean_Lth= weighted.mean(Lth, cover, na.rm=TRUE),
-            Wmean_LA= weighted.mean(LA, cover, na.rm=TRUE),
+            Wmean_LA= weighted.mean(sqrtLA, cover, na.rm=TRUE),
             Wmean_SLA= weighted.mean(SLA, cover, na.rm=TRUE),
-            Wmean_Height= weighted.mean(Height, cover, na.rm=TRUE),
+            Wmean_Height= weighted.mean(logHeight, cover, na.rm=TRUE),
             Wmean_CN = weighted.mean(CN, cover, na.rm=TRUE),
             Wmean_C = weighted.mean(C, cover, na.rm=TRUE),
             Wmean_N = weighted.mean(N, cover, na.rm=TRUE),
             Wvar_LDMC= wt.var(LDMC, cover),
             Wvar_Lth= wt.var(Lth, cover),
-            Wvar_LA= wt.var(LA, cover),
+            Wvar_LA= wt.var(sqrtLA, cover),
             Wvar_SLA= wt.var(SLA, cover),
-            Wvar_Height= wt.var(Height, cover),
+            Wvar_Height= wt.var(logHeight, cover),
             Wvar_C = wt.var(C, cover),
             Wvar_N = wt.var(N, cover),
-            Wvar_CN = wt.var(CN, cover))%>%
-  mutate(Year = as.character(Year))%>%
+            Wvar_CN = wt.var(CN, cover)) %>%
   #gather(key= Trait, value= value, -c(turfID:Year))%>%
   ungroup()
 
+# add climate info
 community_FD <- community_FD %>% 
   mutate(tempLevel = recode(siteID, Ulvhaugen = 6.5, Lavisdalen = 6.5,  Gudmedalen = 6.5, Skjellingahaugen = 6.5, Alrust = 8.5, Hogsete = 8.5, Rambera = 8.5, Veskre = 8.5, Fauske = 10.5, Vikesland = 10.5, Arhelleren = 10.5, Ovstedal = 10.5)) %>%
   mutate(temp7010 = recode(siteID, Ulvhaugen=6.17, Lavisdalen=6.45, Gudmedalen=5.87, Skjellingahaugen=6.58, Alrust=9.14, Hogsete=9.17, Rambera=8.77, Veskre=8.67, Fauske=10.3, Vikesland=10.55, Arhelleren=10.60, Ovstedal=10.78)) %>%
   mutate(precip7010= recode(siteID, Ulvhaugen=596, Lavisdalen=1321, Gudmedalen=1925, Skjellingahaugen=2725, Alrust=789, Hogsete=1356, Rambera=1848, Veskre=3029, Fauske=600, Vikesland=1161, Arhelleren=2044, Ovstedal=2923)) %>%
   mutate(precipLevel = recode(siteID, Ulvhaugen = 600, Alrust = 600, Fauske = 600, Lavisdalen = 1200, Hogsete = 1200, Vikesland = 1200, Gudmedalen = 2000, Rambera = 2000, Arhelleren = 2000, Skjellingahaugen = 2700, Veskre = 2700, Ovstedal = 2700))
 
+# filter away 2017
+community_FD <- community_FD %>% 
+  mutate(turfID = factor(turfID)) %>% 
+  filter(!Year == 2017)
+
 
 #------------ PLOTTING --------------
 
-w <- community_FD %>% mutate(turfID = factor(turfID)) %>% 
-  filter(!Year == 2017) %>% 
-  gather(c(Wmean_LDMC:Wmean_N, richness), key = "trait", value = "value")
+
+community_FD_spp <- community_FD %>% select(-(siteID:Year), -(tempLevel:precipLevel))
+
+set.seed(52)
+NMDS <- metaMDS(community_FD_spp, noshare = TRUE, try = 50)#DNC
+
+fNMDS <- fortify(NMDS) %>% 
+  filter(Score == "sites") %>%
+  bind_cols(community_FD %>% select(siteID:Year, tempLevel:precipLevel))
+
+sNMDS <- fortify(NMDS) %>% 
+  filter(Score == "species")
+
+treat_colours <- c("grey", "grey40", "orange", "purple")
+
+g <- ggplot(fNMDS, aes(x = NMDS1, y = NMDS2)) +
+  geom_point(size = 3, aes(colour = factor(precipLevel), shape = factor(tempLevel))) +
+  geom_text(data = sNMDS, aes(x = NMDS1, y = NMDS2, label = Label)) +
+  coord_equal() +
+  scale_shape_manual(values = c(24, 22, 23, 25)) +
+  scale_colour_manual(values = pal2[c(7,4,1,3)]) +
+  scale_fill_manual(values = pal2[c(7,4,1,3)]) +
+  guides(shape = guide_legend(override.aes = list(fill = "black"))) +
+  labs(colour = "Treatment", fill = "Treatment", shape = "Site", size = "Year") 
+
+ggsave(g, filename = "~/OneDrive - University of Bergen/Research/FunCaB/figures/NMDStraits.jpg", dpi = 300)
+
+set.seed(32)
+HA <- two_sites_nmds("H", "A")
+AM <- two_sites_nmds("A", "M")
+ML <- two_sites_nmds("M", "L")
+LM <- two_sites_nmds("L", "M") 
+
+HA <- HA %>% mutate(Dim1 = -Dim1)
+ML <- ML %>% mutate(Dim1 = -Dim1)
+LM <- LM %>% mutate(Dim1 = -Dim1)
 
 
-xtest <- xtabs(value ~ trait + turfID, data = w)
-plot(rda(xtest))
+all_ord <- bind_rows(
+  `H - A` = HA, 
+  `A - M` = AM, 
+  `M - L` = ML, 
+  `L - ` = LM, .id = "which") %>% 
+  mutate(which = factor(which, levels = c("H - A", "A - M", "M - L", "L - "), labels = c("High Alpine - Alpine", "Alpine - Middle", "Middle - Lowland", " - Lowland")))
 
-  do({
-    spp <- xtabs(Wmean_SLA ~ turfID, data = .)
-    spp <- as.data.frame(unclass(spp))
-    spp <- spp[,colSums(spp > 0) > 0]
-    
-    ulv_env <- distinct(., ID, .keep_all = TRUE)
-    treat <- as.factor(ulv_env$tempLevel)
-    
-    prc1 <- metaMDS(spp)
-     # to select spp above k abundance
-    
-  })
+OrdinationPlot <- g %+% all_ord +
+  labs(x = "NMDS1", y = "NMDS2") +
+  facet_wrap(~ which)
+
+ggsave(OrdinationPlot, filename = "community/FinalFigures/OrdinationPlot.png", height = 7, width = 8, dpi = 300)

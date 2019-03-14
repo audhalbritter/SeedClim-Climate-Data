@@ -169,7 +169,7 @@ ImportData <- function(site){
   # Define directory (recursive = true reads subdirectories)
   myfiles <- dir(path = paste0("/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_groups/SeedClim-Climate-Data/UVB"), pattern = ".txt", recursive = TRUE, full.names = TRUE)
   # make a list of textfiles
-  mdat <- plyr::ldply(as.list(myfiles), ReadData, site = site)
+  mdat <- plyr::ldply(as.list(myfiles), ReadData)
   mdat
 }
 

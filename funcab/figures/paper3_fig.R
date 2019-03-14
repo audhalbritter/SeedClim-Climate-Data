@@ -1,114 +1,210 @@
-composition <- composition %>% 
-  filter(!Treatment == "XC")
+# source species composition compilation
+source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/funcab/vegetation/00funcab_data_processing.R")
 
-#### Load trait data ####
+# source trait imputation
+source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/funcab/vegetation/trait_imputation.R")
 
-# compile CWM an Fdiv trait values
-# load imputation files for each traits for all species
+library(vegan)
+library(TAM)
 
-trait_C <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_C.csv", header =TRUE, sep = ";", dec = ",") %>%
-  mutate(Species = paste0(Site, "_", Species)) %>%
-  select( Site, Species, predictValue, predictionSE) #, predictionSE
-trait_N <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_N.csv", header =TRUE, sep = ";", dec = ",") %>%
-  select(predictValue, predictionSE)
-trait_CN <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_CN.ratio.csv", header =TRUE, sep = ";", dec = ",") %>%
-  select(predictValue, predictionSE)
-trait_SLA <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_SLA.csv", header =TRUE, sep = ";", dec = ",") %>%
-  select(predictValue, predictionSE)
-trait_Lth <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_Lth_ave.csv", header =TRUE, sep = ";", dec = ",") %>%
-  select(predictValue, predictionSE)
-trait_LDMC <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_LDMC.csv", header =TRUE, sep = ";", dec = ",") %>%
-  select(predictValue, predictionSE)
-trait_logLA <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_logLA.csv", header =TRUE, sep = ";", dec = ",") %>%
-  select(predictValue, predictionSE)
-trait_logHeight <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/imputation_files/speciesSitePredictions_logHeight.csv", header =TRUE, sep = ";", dec = ",") %>%
-  select(predictValue, predictionSE)
+# filter for funcab-only turfs
+comp2 <- comp2 %>% 
+  filter(!Treatment == "XC", Year == 2017)
 
-Species_traits <-bind_cols(trait_C, trait_N, trait_CN, trait_SLA,
-                           trait_Lth, trait_LDMC, trait_logLA, trait_logHeight)%>%
-  rename(C = predictValue, N = predictValue1, CN = predictValue2, SLA =
-           predictValue3, Lth = predictValue4, LDMC = predictValue5, LA =
-           predictValue6, Height = predictValue7)
-
-## check distribution of imputation values of traits
-ggplot(Species_traits, aes(SLA)) +
-  geom_density() +
-  facet_wrap(~Site)
-## Distribution of imputed values within range of measured traits
-
-## Checked SE values for each trait- Emp_nig, Emp_her, Ver_alp and Sil_vul very large SE remove from dataset
-Species_traits <- Species_traits %>%
-  filter(!grepl("Emp_",  Species))%>%
-  filter(!grepl("Ver_alp",  Species))%>%
-  filter(!grepl("Sil_vul",  Species)) %>% 
-  mutate(Site = plyr::mapvalues(Site, from = dict_Site$old, to = dict_Site$new)) %>%
-  select(siteID = Site, speciesID = Species, C, N, CN, SLA, Lth, LDMC, LA, Height) %>% 
-  mutate(speciesID = substr(speciesID, 5, n()),
-         speciesID = gsub("_", ".", speciesID),
-         speciesID = paste0(siteID, "_", speciesID))
-
-
-
-# calculation of CWM and FDvar; Community weighted mean and community-weighted variance of trait values
-# join imputed traits with species cover
-# wt.var() calculate weighted variance
-
-community_cover_1516 <- composition %>%
+# create grouping variable before merge
+community_cover <- comp2 %>%
   mutate(speciesID = paste0(siteID,"_", species))
 
-community_FD <- left_join(community_cover_1516, Species_traits, by = c("speciesID", "siteID")) %>%
-  select(siteID, turfID, Year, species, functionalGroup, Treatment, cover, graminoidCov, forbCov, bryophyteCov, C, N, CN, SLA, Lth, LDMC, LA, Height) %>%
-  group_by(turfID, functionalGroup, siteID) %>%
-  filter(!is.na(cover),
-         Year == 2017,
-         !Treatment == "XC") %>%
+# calculation of CWM and FDvar; Community weighted mean and community-weighted variance of trait values
+# join imputed traits with species cover, and filter for treatment
+community_FD <- left_join(community_cover, Species_traits, by = c("speciesID", "siteID")) %>%
+  select(siteID, Treatment, blockID, turfID, Year, tempLevel, temp7010, temp0916, precipLevel, precip7010, precip0916, species, functionalGroup, cover, C, N, CN, SLA, Lth, LDMC, sqrtLA, logHeight) %>%
+  filter(!is.na(cover), cover > 0)
+
+# calculate community weighted means and variances
+# https://rdrr.io/cran/TAM/man/weighted_Stats.html
+community_FD <- community_FD %>% 
+  group_by(siteID, blockID, turfID, Treatment, Year) %>%
   mutate(richness = sum(n_distinct(species))) %>%
   mutate(diversity = diversity(cover, index = "shannon")) %>%
-  mutate(evenness = (diversity/log(richness)))%>%
-  mutate(sumcover = sum(cover),
-         richness = mean(richness),
-         diversity = mean(diversity),
-         evenness = mean(evenness),
-         wmean_LDMC= weighted.mean(LDMC, cover, na.rm=TRUE),
-         wmean_Lth= weighted.mean(Lth, cover, na.rm=TRUE),
-         wmean_LA= weighted.mean(LA, cover, na.rm=TRUE),
-         wmean_SLA= weighted.mean(SLA, cover, na.rm=TRUE),
-         wmean_Height= weighted.mean(Height, cover, na.rm=TRUE),
-         wmean_CN = weighted.mean(CN, cover, na.rm=TRUE),
-         wmean_C = weighted.mean(C, cover, na.rm=TRUE),
-         wmean_N = weighted.mean(N, cover, na.rm=TRUE),
-         cwv_LDMC= wt.var(LDMC, cover),
-         cwv_Lth= wt.var(Lth, cover),
-         cwv_LA= wt.var(LA, cover),
-         cwv_SLA= wt.var(SLA, cover),
-         cwv_Height= wt.var(Height, cover),
-         cwv_C = wt.var(C, cover),
-         cwv_N = wt.var(N, cover),
-         cwv_CN = wt.var(CN, cover)) %>%
+  mutate(evenness = (diversity/log(richness))) %>% 
+  group_by(siteID, blockID, turfID, Treatment, functionalGroup, tempLevel, temp7010, temp0916, precipLevel, precip7010, precip0916) %>%
+  #gather(LDMC, Lth, sqrtLA, SLA, logHeight, CN, C, N, key = "trait", value = "value")
+  summarise(sumcover = sum(cover),
+            richness = mean(richness),
+            diversity = mean(diversity),
+            evenness = mean(evenness),
+            Wmean_LDMC = weighted_mean(LDMC, cover),
+            Wmean_Lth= weighted_mean(Lth, cover),
+            Wmean_LA= weighted_mean(sqrtLA, cover),
+            Wmean_SLA= weighted_mean(SLA, cover),
+            Wmean_Height= weighted_mean(logHeight),
+            Wmean_CN = weighted_mean(CN, cover),
+            Wmean_C = weighted_mean(C, cover),
+            Wmean_N = weighted_mean(N, cover),
+            Wvar_LDMC= wt.var(LDMC, cover),
+            Wvar_Lth = wt.var(Lth, cover),
+            Wvar_LA  = wt.var(sqrtLA, cover),
+            Wvar_SLA = wt.var(SLA, cover),
+            Wvar_Height = wt.var(logHeight, cover),
+            Wvar_C = wt.var(C, cover),
+            Wvar_N = wt.var(N, cover),
+            Wvar_CN = wt.var(CN, cover),
+            Wkur_LDMC= weighted_kurtosis(LDMC, cover),
+            Wkur_Lth = weighted_kurtosis(Lth, cover),
+            Wkur_LA  = weighted_kurtosis(sqrtLA, cover),
+            Wkur_SLA = weighted_kurtosis(SLA, cover),
+            Wkur_Height = weighted_kurtosis(logHeight, cover),
+            Wkur_C = weighted_kurtosis(C, cover),
+            Wkur_N = weighted_kurtosis(N, cover),
+            Wkur_CN = weighted_kurtosis(CN, cover)) %>%
   #gather(key= Trait, value= value, -c(turfID:Year))%>%
-  ungroup() %>% 
-  select((siteID:bryophyteCov), (richness:cwv_CN), -Year, -species, -cover) %>%
-  distinct(turfID, functionalGroup, .keep_all = TRUE)
+  ungroup()
 
+# gather traits
 community_FD <- community_FD %>% 
-  mutate(tempLevel = recode(siteID, Ulvhaugen = 6.5, Lavisdalen = 6.5,  Gudmedalen = 6.5, Skjellingahaugen = 6.5, Alrust = 8.5, Hogsete = 8.5, Rambera = 8.5, Veskre = 8.5, Fauske = 10.5, Vikesland = 10.5, Arhelleren = 10.5, Ovstedal = 10.5)) %>%
-  mutate(temp7010 = recode(siteID, Ulvhaugen=6.17, Lavisdalen=6.45, Gudmedalen=5.87, Skjellingahaugen=6.58, Alrust=9.14, Hogsete=9.17, Rambera=8.77, Veskre=8.67, Fauske=10.3, Vikesland=10.55, Arhelleren=10.60, Ovstedal=10.78)) %>%
-  mutate(precip7010= recode(siteID, Ulvhaugen=596, Lavisdalen=1321, Gudmedalen=1925, Skjellingahaugen=2725, Alrust=789, Hogsete=1356, Rambera=1848, Veskre=3029, Fauske=600, Vikesland=1161, Arhelleren=2044, Ovstedal=2923)) %>%
-  mutate(precipLevel = recode(siteID, Ulvhaugen = 600, Alrust = 600, Fauske = 600, Lavisdalen = 1200, Hogsete = 1200, Vikesland = 1200, Gudmedalen = 2000, Rambera = 2000, Arhelleren = 2000, Skjellingahaugen = 2700, Veskre = 2700, Ovstedal = 2700))
+  #filter(Treatment %in% c("C", "FGB", "GF", "GB", "FB")) %>% 
+  gather(c(sumcover:Wkur_CN), key = "trait", value = "value")
 
-# make anomalies from control plots
 
-community_FD <- community_FD %>% 
-  filter(Treatment %in% c("C", "FGB", "GF", "GB", "FB")) %>% 
-  distinct(siteID, turfID, Treatment, .keep_all = TRUE) %>% 
-  mutate(blockID = substr(turfID, 4,4)) %>% 
-  select(-(cwv_LDMC:cwv_CN), -functionalGroup) %>% 
-  gather(c(richness: wmean_N), key = "trait", value = "value")
+#--------- analyses --------------#
+#load packages
+library(lme4)
+library(MuMIn)
+library(GGally)
+library(tibble)
+library(broom)
 
-community_FD  %>% group_by(turfID, trait, Treatment, siteID, blockID) %>% 
+# Scaling explanatory variables
+# relevel treatment so that TTC is the intercept
+community_FD_analysis <- community_FD %>% 
+  mutate(Sprecip0916 = as.numeric(scale(precip0916)),
+         Stemp0916 = as.numeric(scale(temp0916))) %>% 
+  mutate(Treatment = factor(Treatment, levels = c("C", "FGB", "GF", "GB", "FB", "G", "F", "B"))) %>% 
+  group_by(trait, functionalGroup) %>% 
+  mutate(value = scale(value)) %>% 
+  filter(!is.na(value), !is.infinite(value))
+
+mod1temp <- community_FD_analysis %>% 
+  filter(Treatment %in% c("C", "G", "B", "GB"), functionalGroup == "forb") %>% 
+  group_by(trait) %>%
+  do({
+    mod <- lmer(value ~ Treatment*Stemp0916*Sprecip0916 + (1|siteID/blockID), REML = FALSE, data = .)
+    tidy(mod)}) %>% 
+  #filter(term %in% c("TTtreatRTC","TTtreatRTC:Stemp0916:SYear", "TTtreatRTC:Sprecip0916:SYear", "TTtreatRTC:SYear")) %>% 
+  arrange(desc(trait)) %>% 
+  mutate(lower = (estimate - std.error*1.96),
+         upper = (estimate + std.error*1.96)) %>% 
+  ungroup()
+
+mod2temp <- community_FD_analysis %>% 
+  filter(Treatment %in% c("C", "F", "B", "FB"), functionalGroup == "graminoid") %>% 
+  group_by(trait) %>%
+  do({
+    mod <- lmer(value ~ Treatment*Stemp0916*Sprecip0916 + (1|siteID/blockID), REML = FALSE, data = .)
+    tidy(mod)}) %>% 
+  #filter(term %in% c("TTtreatRTC","TTtreatRTC:Stemp0916:SYear", "TTtreatRTC:Sprecip0916:SYear", "TTtreatRTC:SYear")) %>% 
+  arrange(desc(trait)) %>% 
+  mutate(lower = (estimate - std.error*1.96),
+         upper = (estimate + std.error*1.96)) %>% 
+  ungroup()
+
+
+
+
+
+
+
+
+# source plotting colours etc
+source("~/OneDrive - University of Bergen/Research/FunCaB/SeedclimComm/inst/graminoidRemovals/plotting_dim.R")
+
+community_FDPlot <- community_FD %>% 
+  select(-(Wvar_LDMC:Wvar_CN)) %>% 
+  group_by(turfID, trait, siteID, functionalGroup) %>% 
   left_join(community_FD %>% filter(Treatment == "C") %>% ungroup() %>% select(Cvalue = value, siteID, blockID, trait)) %>%
-  mutate(valueAnom = value - Cvalue) 
-  
+  mutate(valueAnom = value - Cvalue,
+         char = case_when(
+           Treatment %in% c("B", "F", "G") ~ "effect",
+           Treatment %in% c("FB", "GF", "GB") ~ "response"
+         )) %>%
+  filter(!Treatment %in% c("C", "FGB"))
+
+
+community_cover %>% 
+  gather(mossCov, forbCov, graminoidCov, key = FG, value = value) %>% 
+  group_by(turfID, siteID, FG) %>% 
+  left_join(community_cover %>% filter(Treatment == "C") %>% ungroup() %>% select(Cvalue = value, siteID, blockID, trait))
 
 #------------ PLOTTING --------------
+community_FDPlot %>% ggplot(aes(x = tempLevel, y = valueAnom, colour = Treatment, linetype)) +
+  stat_summary(fun.data = "mean_cl_boot", size = 0.8, position = position_dodge(0.5)) +
+  #stat_summary(fun.data = "mean_cl_boot", geom = "line", size = 0.8) +
+  facet_wrap(~ trait, scales = "free_y") +
+  geom_hline(yintercept = 0)
 
+community_FDPlot %>% ggplot(aes(x = precipLevel, y = valueAnom, colour = Treatment, linetype)) +
+  stat_summary(fun.data = "mean_cl_boot", size = 0.8, position = position_dodge(130)) +
+  #stat_summary(fun.data = "mean_cl_boot", geom = "line", size = 0.8) +
+  facet_wrap(~ trait, scales = "free_y") +
+  geom_hline(yintercept = 0)
+
+
+g <- community_FDPlot %>% 
+  filter(!Treatment == "GF") %>%
+ # mutate(Treatment = case_when(
+ #  Treatment == "FB" ~ "G",
+ #  Treatment == "GB" ~ "F"
+ #)) %>% 
+  group_by(trait) %>% 
+  mutate(scaleAnom = scale(valueAnom)) %>% 
+  filter(!is.na(functionalGroup)) %>% 
+  ggplot(aes(x = factor(tempLevel), y = factor(precipLevel), fill = scaleAnom)) +
+  geom_tile() +
+  scale_fill_gradient2(low = pal1[3], mid = "snow1", high = pal1[4]) +
+  facet_grid(trait~char*Treatment*functionalGroup, scales = "free")
+
+ggsave(g, filename = "~/OneDrive - University of Bergen/Research/FunCaB/paper 3/figures/fig1.jpg", dpi = 300, height = 22.5, width = 11)
+
+
+
+#---------- abundance/dominance analyses and figures -----------#
+abund <- comp2 %>% 
+  #filter(functionalGroup == "forb") %>% 
+  group_by(siteID, Year, species, tempLevel, precipLevel, Treatment, functionalGroup) %>% 
+  summarise(meanCov = mean(cover)) %>% 
+  ungroup() %>% 
+  group_by(precipLevel, tempLevel, species) %>%
+  mutate(dominance = case_when(
+    mean(meanCov) > 16 ~ "dominant",
+    mean(meanCov)  < 16 ~ "subordinate"
+  )) %>% 
+  #mutate(dominance = if_else(mean(meanCov, na.rm = TRUE) > 15, "dominant", "subordinate")) %>% 
+  mutate(label = if_else(dominance == "dominant", as.character(species), NA_character_))
+
+lm1 <- lm(meanCov ~ species + precipLevel + 0, data = abund) %>% 
+  tidy() %>% 
+  mutate(term = gsub("species", "", term)) %>% 
+  filter(!term == "precip")
+
+lm1
+
+abund %>%
+  left_join(lm1, by = c("species" = "term")) %>% 
+  filter(!Treatment %in% c("FGB", "C"), dominance == "dominant") %>% 
+  ggplot(aes(x = precipLevel, y = meanCov, colour = dominance, group = species)) +
+  #stat_summary(fun.data = "mean_cl_boot", geom = "line") +
+  #geom_line() +
+  geom_label(aes(label = label),
+             nudge_x = -0.6,
+             nudge_y = -2.45,
+             na.rm = TRUE) +
+  scale_colour_manual(values = c("Black", "grey80")) +
+  facet_grid(. ~ Treatment*functionalGroup) +
+  geom_point(size = 3) +
+  labs(y = "Mean cover (%)") +
+  axis.dimLarge +
+  theme(legend.position = "none",
+        axis.title.x = element_blank())
+
+ggsave(filename = paste0("fig4.jpg"), width = 11, height = 4.5, dpi = 300, path = "~/OneDrive - University of Bergen/Research/FunCaB/figures")

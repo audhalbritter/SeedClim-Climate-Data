@@ -6,6 +6,7 @@ library(readxl)
 library(quantreg)
 library(broom)
 
+source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/funcab/dictionaries.R")
 
 #### Read in iButtons Function
 ReadIniButtons <- function(textfile){
@@ -89,7 +90,7 @@ dictionary <- dictionary16 %>%
          ID = gsub(pattern = "000000", "", ID),
          ID = gsub(pattern = ".txt", "", ID),
          ID = gsub(pattern = " DS1922L", "", ID)) %>% 
-  filter(!Comments %in% c("CSV file missing", "FAIL", "Lost", "NO DATA", "no data on iButton", "X", "X Dead"))
+  filter(!Comments %in% c("FAIL", "Lost", "NO DATA", "no data on iButton", "X", "X Dead"))
 
 
 # MAKE LIST OF ALL TXT FILES AND MERGE THEM TO ONE DATA FRAME
@@ -109,7 +110,7 @@ trial <- mdat %>%
          ID = gsub(pattern = "000000", "", ID),
          ID = gsub(pattern = ".txt", "", ID),
          ID = gsub(pattern = " DS1922L", "", ID)) %>% 
-  filter(!ID %in% c("093E41FB41_2017", "5E3E332741_2017", "843E3EA341_2017", "263E0D9441_2017", "FC3E48CE41second_2017")) %>%
+  filter(!ID %in% c("093E41FB41_2017", "5E3E332741_2017", "843E3EA341_2017", "263E0D9441_2017", "FC3E48CE41second_2017", "E43E3BA541 GUD TTCP8_2016")) %>%
   mutate(ID = gsub(pattern = "123E354941_2017", "123E354941_2016", ID),
          ID = gsub(pattern = "0440282241_2017", "440282241_2017", ID),
          ID = gsub(pattern = "9C3E407D41_2017", "3E407D41_2016", ID),
@@ -123,6 +124,7 @@ trial <- mdat %>%
 
 # setdiff(trial$ID, dictionary$ID) <- what's in trial that's not in dictionary
 # setdiff(dictionary$ID, trial$ID) <- what's in dictionary that's not in trial
+# need to fix 2017 data = seems to be a lot missing from the dictionary
 
 trial <- trial %>% 
   mutate(Year = as.numeric(Year)) %>% 
@@ -131,6 +133,9 @@ trial <- trial %>%
   mutate(Treatment = if_else(ID == "3E369341_2016", "GB", Treatment)) %>% 
   rename(Year = Year.y) %>% 
   filter(!Block %in% c("E5", "E2", "E9"))
+
+# find out who the problematic ones are
+trial %>% filter(is.na(Year)) %>% distinct(siteID, ID) %>% View()
 
 # Check start and end date
 trial %>% 
@@ -184,8 +189,7 @@ iButtonData <- iButtonData %>%
   left_join(dict_TTC_turf)
 
 ##### save and load ibutton data #######
-#save(iButtonData, file = "~/OneDrive - University of Bergen/Research/FunCaB/Data/iButton2016-2017.RData")
-load("iButton2016-2017.RData")
+save(iButtonData, file = "~/OneDrive - University of Bergen/Research/FunCaB/Data/iButton2015-2017.RData")
 
 iButtonData %>%
   #filter(Temperature_level == 8.5, Precipitation_level == 2.7, Date < "2016-08-01 00:00:00") %>% 
@@ -202,7 +206,7 @@ iButtonData %>%
 
 # read in UVB data
 # source the Functions_ReadInSeedClimClimate script
-source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/ibuttons/Functions_ReadInUVBData.R")
+source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/funcab/climate/uv/Functions_ReadInUVBData.R")
 
 uvb <- ImportData(site = c("Ovstedal", "Arhelleren", "Veskre", "Skjellingahaugen", "Rambera", "Fauske", "Alrust", "Ulvhaugen", "Vikesland", "Hogsete", "Lavisdalen", "Gudmedalen"))
 
@@ -227,7 +231,6 @@ uvb %>%
   arrange(var)
 
 #save(uvb, file = "funcab_uvb.RData")
-load("/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_groups/SeedClim-Climate-Data/funcab_uvb.RData")
 
 # 95% quantile regression to determine sunniness for each site at each hour of DOY
 predictions <- uvb %>% 
@@ -245,7 +248,7 @@ sunniness <- predictions %>%
   summarise(sunniness = weighted.mean(prop, w = .fitted)) %>% 
   mutate(sunniness = if_else(sunniness > 1, 1, sunniness)) %>%
   ungroup() %>% 
-  mutate(siteID = plyr::mapvalues(site, from = dict_Site$old, to = dict_Site$new)) %>% 
+  mutate(siteID = plyr::mapvalues(site, from = dict_Site$v3, to = dict_Site$new)) %>% 
   select(-site)
 
 sunniness <- sunniness %>% 
@@ -291,10 +294,7 @@ climate <- climate %>%
   select(-c(Temperature, Year, Month, Day), siteID = Site, gridPrecipitation = Precipitation, date = Date)
   
 
-#### composition data ####
-source("/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_groups/SeedClim-Climate-Data/loadCompositionData.R")
-
-#### compiling the data #### 
+#----------- Data compilation -------------#
 soilTemp <- iButtonData %>% 
   mutate(hour = hour(Date), date = date(Date)) %>% 
   select(-Date, -DOY, -Comments, -ReplacementDate2018, -RemovalDate, -ReplacementDate) %>% 
@@ -311,4 +311,3 @@ soilTemp <- climate %>%
   filter(!turfID == "Lav3GF") # removed due to irregular logging
 
 save(soilTemp, file = "~/OneDrive - University of Bergen/Research/FunCaB/Data/soilTemp.RData")
-

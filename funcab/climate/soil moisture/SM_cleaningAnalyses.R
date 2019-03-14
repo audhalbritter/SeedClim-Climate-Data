@@ -3,13 +3,15 @@
 library(readxl)
 library(tidyverse)
 library(lubridate)
+library(lme4)
+library(broom)
 
 #seedclim site-level soil moisture
 #load("/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_groups/SeedClim-Climate-Data/Soilmoisture.RData")
 
 #use soil moisture differences!
 # read in soil moisture data FUNCAB point measurements
-SM201516 <- read_excel("~/OneDrive - University of Bergen/Research/FunCaB/Data/soilMoisture_2015-2016.xlsx")
+SM201516 <- read_excel("~/OneDrive - University of Bergen/Research/FunCaB/Data/climate_data/soilMoisture_2015-2016.xlsx")
 #SM2017 <- read_excel(path = "/Volumes/fja062/PhD/Data/Soilmoisture2017.xlsx")
 
 SM201516 <- SM201516 %>% 
@@ -52,21 +54,7 @@ SM201516 <- SM201516 %>%
 
 SM201516 <- SM201516 %>% 
   filter(!is.na(block)) %>% 
-  mutate(Treatment = if_else(Treatment == "TTC", "C", Treatment)) %>% 
-  mutate(siteID = plyr::mapvalues(siteID, from = dict_Site$old, to = dict_Site$new))
-
-vegComp %>% 
-  filter(between(date, ymd("2015-07-01"), ymd("2016-08-30"))) %>%
-  left_join(SM201516, by = c("siteID", "date", "turfID", "Treatment")) %>% 
-  arrange(date) %>% 
-  group_by(turfID) %>% 
-  #mutate(lagPrec = lag(gridPrecipitation, n = 1)) %>% 
-  #filter(!(lagPrec > 7)) %>% 
-  ungroup() %>% 
-  ggplot(aes(x = date, y = gridPrecipitation)) +
-  geom_line() +
-  geom_point(aes(y = SM, colour = Treatment)) +
-  facet_wrap(~ siteID)
+  mutate(Treatment = if_else(Treatment == "TTC", "C", Treatment))
 
 
 smVeg <- vegComp %>% 
@@ -124,11 +112,11 @@ ggsave(SMplot, file = "~/Documents/seedclimComm/figures/smplot4.jpg", dpi = 300,
 
 #treatment
 #### with TEMP ####
-modSMT <- smVeg %>%
-  #filter(!Treatment == "FGB") %>% 
+modSMT <- SM201516 %>%
+  filter(!Treatment == "XC") %>% 
   mutate(Treatment = recode(Treatment, "FGB" = "aFGB")) %>%
   do({
-    mod <- lmer(SM ~ scale(Temp)*Treatment +  (1|siteID/Block), REML = FALSE, data = .)
+    mod <- lmer(SM ~ scale(Temp)*Treatment +  (1|siteID/block), REML = FALSE, data = .)
     tidy(mod)}) %>%  
   mutate(lower = (estimate - std.error*1.96),
          upper = (estimate + std.error*1.96)) %>%
@@ -165,11 +153,11 @@ modSMT1 <- coefPlotsmT %>%
 
 ggsave(modSMT1, file = "~/Documents/seedclimComm/figures/coefplotsmT2.jpg", dpi = 300, width = 6, height = 4)
 
-modSMP <- smVeg %>%
-  #filter(!Treatment == "FGB") %>% 
+modSMP <- SM201516 %>%
+  filter(!Treatment == "XC") %>% 
   mutate(Treatment = recode(Treatment, "FGB" = "aFGB")) %>%
   do({
-    mod <- lmer(SM ~ scale(Precip)*Treatment +  (1|siteID/Block), REML = FALSE, data = .)
+    mod <- lmer(SM ~ scale(Precip)*Treatment +  (1|siteID/block), REML = FALSE, data = .)
     tidy(mod)}) %>%  
   mutate(lower = (estimate - std.error*1.96),
          upper = (estimate + std.error*1.96)) %>%
