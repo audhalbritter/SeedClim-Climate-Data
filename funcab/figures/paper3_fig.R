@@ -84,7 +84,7 @@ community_FD_analysis <- community_FD %>%
   group_by(trait, functionalGroup) %>% 
   mutate(value = if_else(trait == "richness", value, scale(value))) %>%
   filter(is.finite(value))
-
+;)
 #model of effect of graminoids and response of forbs
 mod1temp <- community_FD_analysis %>% 
   filter(Treatment %in% c("C", "G", "B", "GB"), functionalGroup == "forb") %>% 
