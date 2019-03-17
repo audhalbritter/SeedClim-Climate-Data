@@ -63,7 +63,6 @@ community_FD <- community_FD %>%
 
 # gather traits
 community_FD <- community_FD %>% 
-  #filter(Treatment %in% c("C", "FGB", "GF", "GB", "FB")) %>% 
   gather(c(sumcover:Wvar_CN), key = "trait", value = "value")
 
 
@@ -71,11 +70,10 @@ community_FD <- community_FD %>%
 #load packages
 library(lme4)
 library(MuMIn)
-library(GGally)
 library(broom)
 library(broom.mixed)
 
-# Scaling explanatory variables
+# Scaling explanatory variables except for richness (poisson distribution)
 # relevel treatment so that TTC is the intercept
 community_FD_analysis <- community_FD %>% 
   mutate(Sprecip0916 = as.numeric(scale(precip0916)),
@@ -84,16 +82,17 @@ community_FD_analysis <- community_FD %>%
   group_by(trait, functionalGroup) %>% 
   mutate(value = if_else(trait == "richness", value, scale(value))) %>%
   filter(is.finite(value))
-;)
+
+
 #model of effect of graminoids and response of forbs
 mod1temp <- community_FD_analysis %>% 
   filter(Treatment %in% c("C", "G", "B", "GB"), functionalGroup == "forb") %>% 
   mutate(traitII = trait) %>% 
   group_by(trait) %>%
   do({if(.$traitII[1] == "richness"){
-    mod <- glmer(value ~ Treatment*Stemp0916*Sprecip0916 + (1|siteID/blockID), family = "poisson", data = .)
+    mod <- glmer(value ~ Treatment*Stemp0916*Sprecip0916 + (blockID|siteID), family = "poisson", data = .)
   } else {
-    mod <- lmer(value ~ Treatment*Stemp0916*Sprecip0916 + (1|siteID/blockID), REML = FALSE, data = .)
+    mod <- lmer(value ~ Treatment*Stemp0916*Sprecip0916 + (blockID|siteID), REML = FALSE, data = .)
     }
     tidy(mod)}) %>% 
   #filter(term %in% c("TTtreatRTC","TTtreatRTC:Stemp0916:SYear", "TTtreatRTC:Sprecip0916:SYear", "TTtreatRTC:SYear")) %>% 

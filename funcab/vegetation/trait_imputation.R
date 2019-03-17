@@ -39,7 +39,7 @@ Species_traits <- Species_traits %>%
   filter(!grepl("Ver_alp",  Species)) %>%
   filter(!grepl("Sil_vul",  Species)) %>% 
   mutate(Site = plyr::mapvalues(Site, from = dict_Site$old, to = dict_Site$new)) %>%
-  select(siteID = Site, speciesID = Species, C, N, CN, SLA, Lth, LDMC, sqrtLA, logHeight) %>% 
-  mutate(speciesID = substr(speciesID, 5, n()),
-         speciesID = gsub("_", ".", speciesID),
-         speciesID = paste0(siteID, "_", speciesID))
+  select(siteID = Site, species = Species, C, N, CN, SLA, Lth, LDMC, sqrtLA, logHeight) %>% 
+  mutate(species = substr(species, 5, n()),
+         species = gsub("_", ".", species),
+         speciesID = paste0(siteID, "_", species))
