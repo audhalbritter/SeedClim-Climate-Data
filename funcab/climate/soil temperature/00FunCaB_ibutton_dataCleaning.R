@@ -272,7 +272,7 @@ sunniness <- sunniness %>%
 
 
 # Air temperature
-load("/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_groups/SeedClim-Climate-Data/Temperature.RData")
+load("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/data/Temperature.RData")
 
 temperature <- temperature %>% 
   filter(!is.na(value)) %>% 
@@ -286,7 +286,7 @@ temperature <- temperature %>%
 
 
 #### gridded climate data ####
-load("/Volumes/fja062/PhD/Projects/2017_temperature_regulation_of_functional_groups/SeedClim-Climate-Data/GriddedDailyClimateData2009-2016.RData")
+load("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/data/GriddedDailyClimateData2009-2016.RData")
 
 climate <- climate %>%
   filter(between(Date, ymd("2015-07-01"), ymd("2016-08-30"))) %>% 

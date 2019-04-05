@@ -17,7 +17,7 @@ community_cover <- comp2 %>%
 
 # calculation of CWM and FDvar; Community weighted mean and community-weighted variance of trait values
 # join imputed traits with species cover, and filter for treatment
-community_FD <- left_join(community_cover, Species_traits, by = c("speciesID", "siteID")) %>%
+community_FD <- left_join(community_cover, Species_traits, by = c("speciesID", "species", "siteID")) %>%
   select(siteID, Treatment, blockID, turfID, Year, tempLevel, temp7010, temp0916, precipLevel, precip7010, precip0916, species, functionalGroup, cover, C, N, CN, SLA, Lth, LDMC, sqrtLA, logHeight) %>%
   filter(!is.na(cover), cover > 0)
 
@@ -43,13 +43,13 @@ community_FD <- community_FD %>%
             Wmean_C = weighted_mean(C, cover),
             Wmean_N = weighted_mean(N, cover),
             Wvar_LDMC= wt.var(LDMC, cover),
-            Wvar_Lth = wt.var(Lth, cover),
-            Wvar_LA  = wt.var(sqrtLA, cover),
+            Wvar_Lth = sqrt(wt.var(Lth, cover)),
+            Wvar_LA  = sqrt(wt.var(sqrtLA, cover)),
             Wvar_SLA = wt.var(SLA, cover),
             Wvar_Height = wt.var(logHeight, cover),
-            Wvar_C = wt.var(C, cover),
-            Wvar_N = wt.var(N, cover),
-            Wvar_CN = wt.var(CN, cover)) %>% 
+            Wvar_C = sqrt(wt.var(C, cover)),
+            Wvar_N = sqrt(wt.var(N, cover)),
+            Wvar_CN = sqrt(wt.var(CN, cover))) %>% 
             #Wkur_LDMC= weighted_kurtosis(LDMC, cover),
             #Wkur_Lth = weighted_kurtosis(Lth, cover),
             #Wkur_LA  = weighted_kurtosis(sqrtLA, cover),
@@ -90,9 +90,9 @@ mod1temp <- community_FD_analysis %>%
   mutate(traitII = trait) %>% 
   group_by(trait) %>%
   do({if(.$traitII[1] == "richness"){
-    mod <- glmer(value ~ Treatment*Stemp0916*Sprecip0916 + (blockID|siteID), family = "poisson", data = .)
+    mod <- glmer(value ~ Treatment*Stemp0916*Sprecip0916 + (1|siteID/blockID), family = "poisson", data = .)
   } else {
-    mod <- lmer(value ~ Treatment*Stemp0916*Sprecip0916 + (blockID|siteID), REML = FALSE, data = .)
+    mod <- lmer(value ~ Treatment*Stemp0916*Sprecip0916 + (1|siteID/blockID), REML = FALSE, data = .)
     }
     tidy(mod)}) %>% 
   #filter(term %in% c("TTtreatRTC","TTtreatRTC:Stemp0916:SYear", "TTtreatRTC:Sprecip0916:SYear", "TTtreatRTC:SYear")) %>% 
@@ -105,9 +105,13 @@ mod1temp <- community_FD_analysis %>%
 # model of effect of forbs and response of graminoids
 mod2temp <- community_FD_analysis %>% 
   filter(Treatment %in% c("C", "F", "B", "FB"), functionalGroup == "graminoid") %>% 
-  group_by(trait) %>%
-  do({
+  mutate(traitII = trait) %>%
+  group_by(trait) %>% 
+  do({if(.$traitII[1] == "richness"){
+    mod <- glmer(value ~ Treatment*Stemp0916*Sprecip0916 + (1|siteID/blockID), family = "poisson", data = .)
+  } else {
     mod <- lmer(value ~ Treatment*Stemp0916*Sprecip0916 + (1|siteID/blockID), REML = FALSE, data = .)
+  }
     tidy(mod)}) %>% 
   #filter(term %in% c("TTtreatRTC","TTtreatRTC:Stemp0916:SYear", "TTtreatRTC:Sprecip0916:SYear", "TTtreatRTC:SYear")) %>% 
   arrange(desc(trait)) %>% 

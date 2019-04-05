@@ -146,3 +146,57 @@ soilTemp %>%
 
 
 # and we need to add figures to the .gitignore
+coverPlot1 <- maxminAnom %>% 
+  #filter(between(date, ymd("2015-08-01"), ymd("2015-09-30"))) %>%
+  filter(!is.na(bryophyteCov)) %>% 
+  gather(key = response, value = value, graminoidCov, vegetationHeight, forbCov, mossHeight, bryophyteCov) %>% 
+  mutate(response = factor(response, levels = c("graminoidCov", "forbCov", "bryophyteCov", "vegetationHeight", "mossHeight"))) %>% 
+  filter(response %in% c("graminoidCov", "forbCov", "bryophyteCov")) %>% 
+  ggplot(aes(x = value, y = maxAnom)) +
+  geom_smooth(method = "lm", se = TRUE) +
+  geom_point() +
+  stat_summary(geom = "point", fun.y = "mean", alpha = 0.7) +
+  #scale_colour_manual(values = c("black", "grey60")) +
+  #scale_fill_manual(values = c("black", "grey60")) +
+  #facet_wrap( ~ Temperature_level, scales = "free_x") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(y = "temperature anomaly from bare ground",
+       x = "sunniness") +
+  facet_grid(.~response)
+
+#ggsave(coverPlot1, file = "~/Documents/seedclimComm/figures/coverPlot2.jpg", dpi = 300, width = 9, height = 5)
+
+heightPlot1 <- maxmin %>% 
+  #filter(between(date, ymd("2015-08-01"), ymd("2015-09-30"))) %>%
+  filter(Treatment %in% c("C", "B", "G", "F"), weather == "sunny") %>% 
+  gather(key = response, value = value, bryophyteCov, graminoidCov, vegetationHeight) %>% 
+  #filter(response %in% c("bryophyteCov"), value < 580) %>% 
+  ggplot(aes(x = value, y = maxTemp, colour = Treatment, fill = Treatment, group = Treatment)) +
+  geom_smooth(method = "lm", se = TRUE) +
+  stat_summary(geom = "point", fun.y = "mean", alpha = 0.7) +
+  scale_colour_manual("", values = cbPalette) +
+  scale_fill_manual("", values = cbPalette) +
+  facet_grid(Temperature_level~response, scales = "free_x") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  ylab("t") +
+  xlab("vegetation height (mm)") +
+  theme(axis.title.y = element_text(colour = "white"))
+
+#treatment
+maxAnomPlot <- maxminAnom %>% 
+  filter(!between(date, ymd("2015-09-01"), ymd("2016-05-31"))) %>%
+  mutate(year = year(date)) %>% 
+  filter(weather == "sunny") %>% #, !Treatment %in% c("FGB", "B", "G", "F")
+  ggplot(aes(x = Treatment, y = maxAnom, colour = Treatment, fill = Treatment)) +
+  geom_boxplot(alpha = 0.8) +
+  #geom_bar(stat = "summary", alpha = 0.8) +
+  scale_x_discrete(limits = c("GF", "GB", "FB", "G", "F", "B", "C"), labels = c("B", "F", "G", "FB", "GB", "GF", "FGB")) +
+  scale_colour_manual("Functional groups",values = cbPalette[c(7,5,6,2,4,10,1)], limits = c("GF", "GB", "FB", "G", "F", "B", "C"), labels = c("Bryophytes", "Forbs","Graminoids", "Bryophytes and forbs", "Graminoids and bryophytes", "Forbs and graminoids", "Bryophytes, forbs \nand graminoids")) +
+  scale_fill_manual("Functional groups", values = cbPalette[c(7,5,6,2,4,10,1)], limits = c("GF", "GB", "FB", "G", "F", "B", "C"), labels = c("Bryophytes", "Forbs","Graminoids", "Bryophytes and forbs", "Graminoids and bryophytes", "Forbs and graminoids", "Bryophytes, forbs \nand graminoids")) +
+  facet_grid(.~ precipLevel) +
+  geom_hline(yintercept = 0) +
+  geom_vline(xintercept = 3.5, linetype = "dashed") +
+  labs(y = "temperature anomaly from bare ground") +
+  theme(axis.title.x = element_blank())
+
+ggsave(maxAnomPlot, file = "~/Documents/seedclimComm/figures/maxAnomPlot1.jpg", dpi = 300, width = 10, height = 4)

@@ -70,6 +70,5 @@ dict_TTC_turf <- read_delim(delim = ";", file =
 243 TTC;Skj2C
 246 TTC;Skj3C
 251 TTC;Skj4C
-506 TTC;Gud5C
 511 TTC;Gud12C
-516 TTC; Gud13C")
+") #516 TTC;Gud13C | 506 TTC;Gud5C <- temporarily taken out; could be that it's not actually one of ours
