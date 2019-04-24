@@ -14,7 +14,8 @@ con <- src_sqlite(path = "~/OneDrive - University of Bergen/Research/FunCaB/seed
 #con <- src_mysql(group = "seedclim", dbname = "seedclimComm", password = "password")
 
 source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/funcab/dictionaries.R")
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ## ---- database.controls.import ---- 
 # replace species names where mistakes have been found in database
 problems <- read.csv("~/OneDrive - University of Bergen/Research/FunCaB/Data/speciesCorrections.csv", sep = ";", stringsAsFactors = FALSE) %>%
@@ -47,10 +48,6 @@ my.GR.data <-tbl(con, "subTurfCommunity") %>%
   summarise(n_subturf = n()) %>% 
   collect() %>% 
   full_join(tbl(con, "turfCommunity") %>% collect()) %>%
-  #full_join(problems.cover, by = c("year", "turfID", "species"), suffix = c(".community", ".problems")) %>%
-  # mutate(cover = if_else(is.na(cover.community),
-  #                       cover.problems,
-  #                      cover.community)) %>% 
   left_join(tbl(con, "taxon"), copy = TRUE) %>%
   left_join(tbl(con, "turfs"), copy = TRUE) %>%
   left_join(tbl(con, "plots"), by = c("destinationPlotID" = "plotID"), copy = TRUE) %>%
@@ -73,7 +70,7 @@ my.GR.data$GRtreat <- NULL
 my.GR.data$recorder[is.na(my.GR.data$recorder)] <- "unknown botanist"
 my.GR.data$cover[my.GR.data$recorder == "PM"] <- my.GR.data$cover[my.GR.data$recorder=="PM"]*1.20
 
-# fixes for botanist biases
+###--- fixes for botanist biases ---###
 siri <- my.GR.data %>%
   filter(recorder == "Siri") %>%
   group_by(turfID, Year) %>%
@@ -120,46 +117,47 @@ composition <- funcab_2016 %>%
   bind_rows(funcab_2015) %>% 
   bind_rows(gudfun2015) %>% 
   bind_rows(funcab_2017) %>% 
-  select(c(siteID:year), recorder, c(totalGraminoids:mossHeight), litter, acro, pleuro, c(`Ach mil`:`Vis vul`)) %>%
+  filter(subPlot == "%") %>% 
+  select(c(siteID:subPlot), Year = year, recorder, c(totalGraminoids:mossHeight), litter, acro, pleuro, c(`Ach mil`:`Vis vul`)) %>%
   select_if(colSums(!is.na(.)) > 0) %>% 
   gather(c("Ach mil":"Vio sp"), key = "species", value = "cover") %>% 
   mutate(species = gsub("\\ |\\_", ".", species)) %>% 
-  filter(subPlot == "%") %>% 
-  mutate(turfID = plyr::mapvalues(turfID, from = dict_TTC_turf$TTtreat, to = dict_TTC_turf$turfID)) %>% 
+  left_join(dict_TTC_turf, by = c("turfID" = "TTtreat"), suffix = c(".old", ".new")) %>%
+  mutate(turfID = if_else(!is.na(turfID.new), turfID.new, turfID)) %>% 
+  mutate_at(vars(cover, Year, totalGraminoids:pleuro), as.numeric) %>% 
   mutate(turfID = if_else(blockID == 16 & siteID == "Gudmedalen", gsub("16", "5", turfID), turfID),
-         blockID = if_else(blockID == 16 & siteID == "Gudmedalen", gsub("16", "5", blockID), blockID)) %>% 
-  mutate_at(vars(cover, year, totalGraminoids:pleuro), as.numeric) %>% 
-  mutate(blockID = paste0(str_sub(siteID, 1, 3), blockID)) %>% 
-  rename(Year = year) %>% 
-  mutate(turfID = recode(turfID, "Alr4FGB" = "Alr5C")) %>% 
-  filter(!(blockID == "Alr4" & Year == 2015 & siteID == "Alrust")) %>% 
-  mutate(turfID = if_else(blockID == "Alr3" & Year == 2015 & Treatment == "C", "Alr3C", turfID))
+         blockID = if_else(blockID == 16 & siteID == "Gudmedalen", gsub("16", "5", blockID), blockID),
+         turfID = if_else(blockID == "3" & Year == 2015 & Treatment == "C", "Alr3C", turfID),
+         turfID = recode(turfID, "Alr4FGB" = "Alr5C"),
+         turfID = recode(turfID, "Lav1G " = "Lav1G"),
+         blockID = if_else(turfID == "Gud12C", "12", blockID)) %>% 
+  filter(!(blockID == "4" & Year == 2015 & siteID == "Alrust"),
+         !(turfID =="Gud12C" & Year == 2015))
 
-#mutate(functionalGroup = if_else(species %in% c("Gen.sp.", "Cre.pal", "Frag.vir", "Sch.gig", "Ste.bor", "Hie.ore", "Sel.sel."), "forb", functionalGroup),
-#       functionalGroup = if_else(species %in% c("Agr.can", "Phl.sp"), "graminoid", functionalGroup)) %>% 
 
 # overwrite problem spp with their correct names and covers
 composition <- composition %>% 
   left_join(prob.sp, by = c("Year", "turfID", "siteID", "species" = "old"), suffix = c("", ".new")) %>%
   mutate(species = coalesce(new, species),
          cover = coalesce(cover.new, cover)) %>% 
-  select(-new, -cover.new, -subPlot) %>% 
-  mutate(species = plyr::mapvalues(species, from = prob.sp.name$old, to = prob.sp.name$new)) %>% 
-  left_join(FG) %>%
-  group_by_at(vars(-cover)) %>% 
+  select(-new, -cover.new, -subPlot, - turfID.new) %>% 
+  left_join(prob.sp.name, by = c("species" = "old")) %>% 
+  mutate(species = if_else(!is.na(new), new, species)) %>% 
+  group_by_at(vars(-cover, -new)) %>% 
   summarise(cover = sum(cover, na.rm = TRUE)) %>% 
   ungroup()
 
-metadata <- composition %>% 
-  filter(Treatment %in% c("FGB", "GF"), Year > 2015) %>% 
-  select(-species, -cover, -functionalGroup) %>% 
-  distinct()
+FGBs <- composition %>% 
+  filter(Treatment %in% c("FGB", "GF")) %>% 
+  select(-species, -cover) %>% 
+  distinct() %>% 
+  filter(Year > 2015)
 
 # filter out funcab controls that are also TTCs in 2015 & 2016
 ttcs1516 <- composition %>% 
   filter(Treatment == "C", !Year == 2017, !is.na(Year)) %>% 
   right_join(dict_TTC_turf) %>%
-  select(-species, -cover, -functionalGroup, -pleuro, -acro, -litter) %>% 
+  select(-species, -cover, -pleuro, -acro, -litter) %>% 
   distinct()
 
 ttcs17 <- composition %>% 
@@ -169,7 +167,7 @@ ttcs17 <- composition %>%
   mutate(sumcover = sum(cover)) %>% 
   filter(sumcover == 0) %>% 
   ungroup() %>% 
-  select(-species, -cover,  -functionalGroup, -sumcover, -litter) %>% 
+  select(-species, -cover, -sumcover, -litter) %>% 
   distinct() %>% 
   full_join(scBryo, by = "turfID", suffix = c(".old", "")) %>% 
   select(-totalBryophytes.old, -mossHeight.old, -vegetationHeight.old, -TTtreat.old)
@@ -177,83 +175,88 @@ ttcs17 <- composition %>%
 ####################
 #### clean data ####
 
+# join with TTC data
 comp2 <- composition %>% 
   filter(cover > 0) %>% 
-  #filter(!(turfID%in% c("Alr3C", "Gud5C") & Year == 2016), 
-  #       !(turfID %in%c("Gud5C", "Gud12C") & Year == 2015)) %>% 
+  mutate(blockID = if_else(nchar(blockID) > 1, gsub("[^[:digit:]]", "", blockID), blockID)) %>% 
   full_join(my.GR.data, by = c("siteID", "blockID", "turfID", "Treatment", "Year", "species", "recorder"), suffix = c("", ".new")) %>% 
   mutate(cover = if_else(cover == 0|is.na(cover), cover.new, cover),
          mossHeight = if_else(mossHeight == 0|is.na(mossHeight), mossHeight.new, mossHeight),
          vegetationHeight = if_else(vegetationHeight == 0|is.na(vegetationHeight), vegetationHeight.new, vegetationHeight),
-         totalBryophytes = if_else(totalBryophytes == 0|is.na(totalBryophytes), totalBryophytes.new, totalBryophytes)#,
-         ) %>% 
-  select(-totalBryophytes.new, -vegetationHeight.new, -mossHeight.new, -cover.new, functionalGroup) %>% #, -litter.new
-  bind_rows(metadata) %>% 
-  left_join(ttcs1516, by = c("siteID", "blockID", "Treatment", "turfID", "Year", "TTtreat", "recorder"), suffix = c("", ".new")) %>% 
+         totalBryophytes = if_else(totalBryophytes == 0|is.na(totalBryophytes), totalBryophytes.new, totalBryophytes)) %>% 
+  select(-totalBryophytes.new, -vegetationHeight.new, -mossHeight.new, -cover.new)
+
+# rejoin funcab attributes of the TTCs in 2016 and 2017
+comp2 <- comp2 %>% 
+  left_join(ttcs1516, by = c("siteID", "Treatment", "turfID", "Year", "TTtreat"), suffix = c("", ".new")) %>% 
   mutate(mossHeight = if_else(mossHeight == 0|is.na(mossHeight), mossHeight.new, mossHeight),
          vegetationHeight = if_else(vegetationHeight == 0|is.na(vegetationHeight), vegetationHeight.new, vegetationHeight),
          totalBryophytes = if_else(is.na(totalBryophytes), totalBryophytes.new, totalBryophytes),
          totalGraminoids = if_else(is.na(totalGraminoids), totalGraminoids.new, totalGraminoids),
          totalForbs = if_else(is.na(totalForbs), totalForbs.new, totalForbs)) %>% 
-  select(-totalBryophytes.new, -vegetationHeight.new, -mossHeight.new, -totalForbs.new, -totalGraminoids.new) %>% #, -litter.new
+  select(-totalBryophytes.new, -vegetationHeight.new, -mossHeight.new, -totalForbs.new, -totalGraminoids.new) %>%
   left_join(ttcs17, by = c("siteID", "blockID", "Treatment", "turfID", "Year", "TTtreat", "recorder", "acro", "pleuro"), suffix = c("", ".new")) %>% 
   select(-totalBryophytes.new, -vegetationHeight.new, -mossHeight.new, -totalForbs.new, -totalGraminoids.new) %>%
   filter(cover > 0)
 
-comp2 <- within(comp2, mossHeight[turfID == 'Alr1F' & Year == "2017"] <- 0,
-                mossHeight[turfID == 'Alr3G' & Year == 2017] <- 8.6,
-                mossHeight[turfID == 'Alr5F' & Year == 2017] <- 1.75,
-                mossHeight[turfID == 'Alr5G' & Year == 2017] <- 1.75, 
-                mossHeight[turfID == 'Fau2F' & Year == 2017] <- 4,
-                mossHeight[turfID == 'Fau2G' & Year == 2017] <- 4,
-                mossHeight[turfID == 'Fau5F' & Year == 2017] <- 0,
-                mossHeight[turfID == 'Skj2F' & Year == 2017] <- 7,
-                mossHeight[turfID == 'Ulv3F' & Year == 2017] <- 3,
-                mossHeight[turfID == 'Ulv4C' & Year == 2017] <- 0,
-                mossHeight[turfID == 'Alr2GF' & Year == 2017] <- 3,
-                mossHeight[turfID == 'Hog4GF' & Year == 2017] <- 18,
-                mossHeight[turfID == 'Alr1C' & Year == 2017] <- 1.5,
-                vegetationHeight[turfID == 'Alr1C' & Year == 2017] <- 135,
-                vegetationHeight[turfID == 'Alr3GB' & Year == 2017] <- 65,
-                vegetationHeight[turfID == 'Fau4F' & Year == 2017] <- 70,
-                vegetationHeight[turfID == 'Ulv3B' & Year == 2017] <- 44.5,
-                vegetationHeight[turfID == 'Ulv3GB' & Year == 2017] <- 30,
-                vegetationHeight[turfID == 'Ves1FB' & Year == 2017] <- 65,
-                vegetationHeight[turfID == 'Ves2GB' & Year == 2017] <- 40,
-                vegetationHeight[turfID == 'Ves3FB' & Year == 2017] <- 50,
-                totalBryophytes[turfID == 'Alr1F' & Year == 2015] <- 0,
-                totalBryophytes[turfID == 'Alr1FGB' & Year == 2015] <- 0,
-                totalBryophytes[turfID == 'Alr1GB' & Year == 2015] <- 0,
-                totalBryophytes[turfID == 'Alr1GF' & Year == 2015] <- 0,
-                totalBryophytes[turfID == 'Alr3G' & Year == 2015] <- 0,
-                totalBryophytes[turfID == 'Fau2G' & Year == 2015] <- 0,
-                totalBryophytes[turfID == 'Ovs1C' & Year == 2015] <- 100,
-                totalGraminoids[turfID == 'Fau2C' & Year == 2015] <- 40,
-                totalForbs[turfID == 'Fau2C' & Year == 2015] <- 65,
-                totalGraminoids[turfID == 'Gud12C' & Year == 2015] <- 22,
-                totalForbs[turfID == 'Gud12C' & Year == 2015] <- 70,
-                totalGraminoids[turfID == 'Vik2C' & Year == 2015] <- 30,
-                totalForbs[turfID == 'Vik2C' & Year == 2015] <- 60)
+comp2 <- comp2 %>% 
+  mutate(mossHeight = case_when(
+    turfID == 'Alr1F' & Year == 2017 ~ 0,
+    turfID == 'Alr3G' & Year == 2017 ~ 8.6,
+    turfID == 'Alr5F' & Year == 2017 ~ 17.5,
+    turfID == 'Alr5G' & Year == 2017 ~ 17.5,
+    turfID == 'Fau2F' & Year == 2017 ~ 4,
+    turfID == 'Fau2G' & Year == 2017 ~ 4,
+    turfID == 'Fau5F' & Year == 2017 ~ 0,
+    turfID == 'Skj2F' & Year == 2017 ~ 7,
+    turfID == 'Ulv3F' & Year == 2017 ~ 3,
+    turfID == 'Ulv4C' & Year == 2017 ~ 0,
+    turfID == 'Alr2GF' & Year == 2017 ~ 3,
+    turfID == 'Hog4GF' & Year == 2017 ~ 18,
+    turfID == 'Alr1C' & Year == 2017 ~ 15,
+    turfID == 'Arh1F' & Year == 2017 ~ 13.25,
+    TRUE ~ mossHeight),
+    vegetationHeight = case_when(
+      turfID == 'Alr1C' & Year == 2017 ~ 135,
+      turfID == 'Alr3GB' & Year == 2017 ~ 65,
+      turfID == 'Fau4F' & Year == 2017 ~ 70,
+      turfID == 'Ulv3B' & Year == 2017 ~ 44.5,
+      turfID == 'Ulv3GB' & Year == 2017 ~ 30,
+      turfID == 'Ves1FB' & Year == 2017 ~ 65,
+      turfID == 'Ves2GB' & Year == 2017 ~ 40,
+      turfID == 'Ves3FB' & Year == 2017 ~ 50,
+      TRUE ~ vegetationHeight),
+    totalBryophytes = case_when(
+      turfID == 'Alr1F' & Year == 2015 ~ 0,
+      turfID == 'Alr1FGB' & Year == 2015 ~ 0,
+      turfID == 'Alr1GB' & Year == 2015 ~ 0,
+      turfID == 'Alr1GF' & Year == 2015 ~ 0,
+      turfID == 'Alr3G' & Year == 2015 ~ 0,
+      turfID == 'Fau2G' & Year == 2015 ~ 0,
+      turfID == 'Ovs1C' & Year == 2015 ~ 100,
+      turfID == 'Fau2C' & Year == 2015 ~ 40,
+      TRUE ~ totalBryophytes),
+    totalForbs = case_when(
+      turfID == 'Fau2C' & Year == 2015 ~ 65,
+      turfID == 'Gud12C' & Year == 2015 ~ 70,
+      turfID == 'Vik2C' & Year == 2015 ~ 60,
+      TRUE ~ totalForbs),
+    totalGraminoids = case_when(
+      turfID == 'Gud12C' & Year == 2015 ~ 22,
+      turfID == 'Vik2C' & Year == 2015 ~ 30,
+      TRUE ~ totalGraminoids))
 
 
 comp2 <- comp2 %>% 
-  filter(!grepl("RTC", turfID)) %>% 
   group_by(turfID, Year) %>% 
   mutate(totalBryophytes = if_else(is.na(totalBryophytes), pleuro + acro, totalBryophytes)) %>% 
   ungroup() %>% 
   mutate(turfID = if_else(grepl("TTC", turfID), turfID, substring(turfID, 4, n())),
-         Treatment = gsub("FG^", "GF", Treatment),
          Treatment = gsub(" ", "", Treatment),
-         blockID = gsub("[^[:digit:]]", "", blockID),
          turfID = paste0(str_sub(siteID, 1, 3), turfID),
-         species = gsub(" ", ".", species),
-         mossCov = if_else(grepl("B", Treatment), 0, totalBryophytes),
-         forbCov = if_else(grepl("F", Treatment), 0, totalForbs),
-         graminoidCov = if_else(grepl("G", Treatment), 0, totalGraminoids),
-         vegetationHeight = if_else(Treatment == "FGB", 0, vegetationHeight),
-         mossHeight = if_else(Treatment == "FGB", 0, mossHeight)) %>% 
-  select(-totalGraminoids, -totalForbs, -totalBryophytes, -functionalGroup)
+         species = gsub(" ", ".", species))
 
+# functional groups
 comp2 <- comp2 %>% 
   left_join(FG) %>% 
   mutate(functionalGroup = if_else(
@@ -261,12 +264,27 @@ comp2 <- comp2 %>%
     if_else(grepl("woody", functionalGroup), "forb", functionalGroup)))
 
 #fix functional group discrepancies
-comp2 <- comp2 %>% filter(!(Treatment %in% c("GB", "GF", "G", "FGB") & functionalGroup == "graminoid"),
-                 !(Treatment %in% c("FB", "GF", "F", "FGB") & functionalGroup == "forb")) %>% 
+comp2 <- comp2 %>% 
+  filter(!(Treatment %in% c("GB", "GF", "G", "FGB") & functionalGroup == "graminoid"  & Year > 2015),
+         !(Treatment %in% c("FB", "GF", "F", "FGB") & functionalGroup == "forb" & Year > 2015)) %>% 
   mutate(functionalGroup = if_else(species == "Jun.sp", "graminoid",
-                                   if_else(species%in% c("Ped.pal", "Pop.tre", "Arenaria", "Pilosella"), "forb", functionalGroup)))
+                                   if_else(species%in% c("Ped.pal", "Pop.tre", "Arenaria", "Pilosella"), "forb", functionalGroup))) %>%
+  filter(!is.na(cover)) %>% 
+  rename(forbCov = totalForbs, mossCov = totalBryophytes, graminoidCov = totalGraminoids) %>% 
+  bind_rows(FGBs %>% rename(forbCov = totalForbs, graminoidCov = totalGraminoids, mossCov = totalBryophytes))
+
+# filter for  moss values from 2017
+mossHeight <- comp2 %>% 
+  filter(Year == 2017) %>% 
+  select(turfID, mossHeight) %>%
+  filter(!(is.na(mossHeight))) %>% 
+  distinct(turfID, .keep_all = TRUE) %>% 
+  ungroup()
+
+# remove unwanted columns
+comp2 <- comp2 %>% 
+  select(-TTtreat, -blockID.new, -recorder.new, -acro, -pleuro)
+
 
 # add climate info
 source("~/OneDrive - University of Bergen/Research/FunCaB/SeedclimComm/inst/graminoidRemovals/weather.R")
-
-comp2 <- left_join(comp2, weather)

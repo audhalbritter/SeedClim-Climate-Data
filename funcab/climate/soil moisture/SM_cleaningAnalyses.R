@@ -1,5 +1,4 @@
 #### soil moisture ####
-
 library(readxl)
 library(tidyverse)
 library(lubridate)
@@ -16,12 +15,6 @@ SM201516 <- read_excel("~/OneDrive - University of Bergen/Research/FunCaB/Data/c
 
 SM201516 <- SM201516 %>% 
   mutate_at(.vars = c("M1", "M2", "M3", "M4"), as.numeric) %>% 
-  mutate(T_level = recode(site, Ulv = 6.5, Lav = 6.5,  Gud = 6.5, Skj = 6.5, Alr = 8.5, Hog = 8.5, Ram = 8.5, Ves = 8.5, Fau = 10.5, Vik = 10.5, Arh = 10.5, Ovs = 10.5)) %>%
-  mutate(Temp = recode(site, Ulv=6.17, Lav=6.45, Gud=5.87, Skj=6.58, Alr=9.14, Hog=9.17, Ram=8.77, Ves=8.67, Fau=10.3, Vik=10.55, Arh=10.60, Ovs=10.78))%>%
-  mutate(Precip= recode(site, Ulv=596, Lav=1321, Gud=1925, Skj=2725, Alr=789, Hog=1356, Ram=1848, Ves=3029, Fau=600, Vik=1161, Arh=2044, Ovs=2923))%>%
-  mutate(P_level = recode(site, Ulv = 600, Alr = 600, Fau = 600, Lav = 1200, Hog = 1200, Vik = 1200, Gud = 2000, Ram = 2000, Arh = 2000, Skj = 2700, Ves = 2700, Ovs = 2700))
-
-SM201516 <- SM201516 %>% 
   filter(comments %in% c("fewer readings", "above table", "above table 100%")|is.na(comments)) %>%
   filter(!grepl("TT1", turfID),
          !grepl("TT2", turfID),
@@ -37,90 +30,102 @@ SM201516 <- SM201516 %>%
   ungroup() %>% 
   mutate(siteID = plyr::mapvalues(site, from = dict_Site$old, to = dict_Site$new)) %>%
   mutate(FCturfID = if_else(!is.na(removal), paste0(str_sub(siteID, 1, 3), block, removal), ""), date = ymd(date)) %>%
-  #filter(!treatment == "XC") %>% 
+  filter(!treatment == "XC") %>% 
   #!weather %in% c("raining, still", "raining", "Raining", "cloudy/raining", "Overcast; Rainy", "overcast, rainy")) %>%
   select(-site, -c(M1:M4), -blockSD, -treatment, -comments, -Moisture) %>% 
-  rename(Treatment = removal)
+  rename(Treatment = removal) %>% 
+  select(-sameDayMeasurement)
 
 save(SM201516, file = "~/OneDrive - University of Bergen/Research/FunCaB/Data/soilMoisture.RData")
 
-SM201516 <- SM201516 %>% 
-  filter(date > ymd("2016-01-01")) %>% 
-  select(-sameDayMeasurement) %>% 
-  group_by(date, turfID, Treatment, block, weather, siteID) %>% 
-  left_join(SM201516 %>% filter(Treatment == "FGB") %>% ungroup() %>% select(FGBSM = SM, date, block, siteID)) %>%
-  mutate(SMAnom = SM - FGBSM) %>% 
-  ungroup()
 
-SM201516 <- SM201516 %>% 
+SoilMoisture <- SM201516 %>% 
   filter(!is.na(block)) %>% 
-  mutate(Treatment = if_else(Treatment == "TTC", "C", Treatment))
+  mutate(Treatment = if_else(Treatment == "TTC", "C", Treatment)) %>% 
+  select(date, siteID, turfID, Treatment, "blockID" = block, weather, SM) %>%
+  mutate(turfID = plyr::mapvalues(turfID, from = dict_TTC_turf$TTtreat, to = dict_TTC_turf$turfID))
 
 
 smVeg <- vegComp %>% 
-  filter(between(date, ymd("2016-05-09"), ymd("2016-08-29")), !Treatment == "temp200cm") %>%
-  distinct(siteID, date, Block, Treatment, turfID, sunniness, meanTemp, Year.x, vegetationHeight, mossHeight, litter, acro, pleuro, bryophyteCov, forbCov, graminoidCov, forb, graminoid, gridPrecipitation) %>%
-  left_join(SM201516, by = c(Block = "block", "Treatment", "turfID", "date")) %>% 
+  filter(between(date, ymd("2015-05-09"), ymd("2016-08-29")), !Treatment == "temp200cm") %>%
+  distinct(siteID, date, blockID, Treatment, turfID, sunniness, meanTemp, vegetationHeight, mossHeight, litter, mossCov, forbCov, graminoidCov, tempLevel, precipLevel) %>% #, gridPrecipitation
+  left_join(SoilMoisture) %>% 
+  filter(!is.na(SM))
   #mutate(Treatment = relevel(as.factor(Treatment), ref = "C")) %>% 
-  rename(siteID = siteID.x) %>% 
-  select(-siteID.y) %>% 
   arrange(date) %>% 
   group_by(turfID) %>% 
   mutate(lagPrec = lag(gridPrecipitation, n = 1)) %>% 
   #filter(!(lagPrec > 7)) %>% 
   ungroup() %>% 
-  filter(!is.na(SM)) %>% 
   distinct(siteID, Block, turfID, date, Treatment, bryophyteCov, mossHeight, forb, forbCov, graminoidCov, graminoid, SM, Precip, Temp, vegetationHeight, T_level, P_level)
 
-smVeg <- smVeg %>% 
-  mutate(vegCov = case_when(
-    Treatment == "GF" ~ "alone",
-    Treatment == "GB" ~ "alone",
-    Treatment == "FB" ~ "alone",
-    Treatment == "G" ~ "together",
-    Treatment == "B" ~ "together",
-    Treatment == "F" ~ "together",
-    Treatment == "C" ~ "intact"
-  ))
 
 smVegAnom <- smVeg %>% 
-  left_join(smVeg %>% filter(Treatment == "FGB") %>% ungroup() %>% select(FGBSM = SM, date, siteID, Block)) %>%
-  mutate(SMAnom = FGBSM - SM) %>% 
+  left_join(smVeg %>% filter(Treatment == "FGB") %>% ungroup() %>% select(FGBSM = SM, date, siteID, blockID)) %>%
+  mutate(SMAnom = SM - FGBSM) %>% 
   ungroup()
 
 SMplot <- smVegAnom %>%
-  group_by(Treatment) %>% 
-  #summarise(meanSMAnom = mean(SMAnom, na.rm = TRUE),
-  #         seSMAnom = sd(SMAnom, na.rm = TRUE)/sqrt(n())) %>% 
   filter(!Treatment == "FGB") %>% 
-  #filter(Treatment %in% c("GB", "FB", "GF", "C")) %>%
-  ggplot(aes(x = P_level, y = SMAnom, colour = Treatment, fill = Treatment)) + 
+  ggplot(aes(x = precipLevel, y = SMAnom, colour = Treatment, fill = Treatment)) + 
+  geom_point() +
   stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = 100)) +
   stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = 100), geom = "line") +
-  #geom_boxplot(alpha = 0.6) +
-  #geom_bar(stat = "summary", alpha = 0.8) +
-  #geom_errorbar(aes(ymin = meanSMAnom - seSMAnom, ymax =  meanSMAnom + seSMAnom), width = 0.2) +
-  scale_x_discrete(limits = c("C", "GF", "GB", "FB", "G", "F", "B"), labels = c("C", "B", "F", "G", "FB", "GB", "GF")) +
   geom_hline(yintercept = 0) + 
-  scale_colour_manual("Vegetation",values = cbPalette[c(10, 1, 4, 6, 2, 5, 9)], labels = c("Forbs and graminoids", "Forbs, graminoids and bryophytes", "Graminoids and bryophytes", "Graminoids", "Bryophytes and forbs", "Forbs","Bryophytes")) +
-  scale_fill_manual("Vegetation", values = cbPalette[c(10, 1, 4, 6, 2, 5, 9)], labels = c("Forbs and graminoids", "Forbs, graminoids and bryophytes", "Graminoids and bryophytes", "Graminoids", "Bryophytes and forbs", "Forbs","Bryophytes")) #+
-  #geom_vline(xintercept = c(1.5, 4.5), linetype = "dashed") +
-  #facet_grid(T_level~P_level)
+  scale_colour_manual("Vegetation", values = cbPalette[c(10, 1, 4, 6, 2, 5, 9)], labels = c("Forbs and graminoids", "Forbs, graminoids and bryophytes", "Graminoids and bryophytes", "Graminoids", "Bryophytes and forbs", "Forbs","Bryophytes")) +
+  scale_fill_manual("Vegetation", values = cbPalette[c(10, 1, 4, 6, 2, 5, 9)], labels = c("Forbs and graminoids", "Forbs, graminoids and bryophytes", "Graminoids and bryophytes", "Graminoids", "Bryophytes and forbs", "Forbs","Bryophytes")) +
+  facet_wrap(~Treatment)
 
 ggsave(SMplot, file = "~/Documents/seedclimComm/figures/smplot4.jpg", dpi = 300, width = 10, height = 4)
 
 
+smCovPlot <- smVegAnom %>% 
+  filter(between(date, ymd("2015-07-01"), ymd("2015-09-30")),
+         Treatment %in% c("GF", "FB", "GB")) %>% 
+  gather(key = response, value = value, graminoidCov, vegetationHeight, forbCov, mossHeight, mossCov) %>%
+  mutate(response = factor(response, levels = c("graminoidCov", "forbCov", "mossCov", "vegetationHeight", "mossHeight"))) %>% 
+  filter(value > 0,
+         response %in% c("graminoidCov", "forbCov", "mossCov")) %>% 
+  ggplot(aes(x = value, y = SMAnom, fill = response)) +
+  stat_summary(geom = "point", fun.y = "mean", alpha = 0.9, shape = 21, size = 2) +
+  geom_smooth(method = "lm", se = TRUE, colour = "black", size = 0.5) +
+  scale_fill_manual(values = pal1[c(2,4,5)]) +
+  #scale_fill_manual(values = c("black", "grey60")) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(x = "Cover (%)",
+       y = "moisture anomaly from bare ground")
+ggsave(smCovPlot, file = "~/OneDrive - University of Bergen/Research/FunCaB/paper 2/figures/Fig4a.jpg", dpi = 300, width = 8, height = 5)
+
+
+smHeightPlot <- smVegAnom %>% 
+  filter(between(date, ymd("2015-07-01"), ymd("2015-09-30")),
+         Treatment %in% c("GF", "FB", "GB")) %>% 
+  gather(key = response, value = value, graminoidCov, vegetationHeight, forbCov, mossHeight, mossCov) %>%
+  mutate(response = factor(response, levels = c("graminoidCov", "forbCov", "mossCov", "vegetationHeight", "mossHeight"))) %>% 
+  filter(value > 0,
+         response %in% c("vegetationHeight", "mossHeight")) %>% 
+  ggplot(aes(x = value, y = SMAnom, fill = response)) +
+  stat_summary(geom = "point", fun.y = "mean", alpha = 0.9, shape = 21, size = 2) +
+  geom_smooth(method = "lm", se = TRUE, colour = "black", size = 0.5) +
+  scale_fill_manual(values = pal1[c(2,4,5)]) +
+  #scale_fill_manual(values = c("black", "grey60")) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(x = "Height (mm)",
+       y = "moisture anomaly from bare ground") +
+  facet_grid(.~response, scales = "free_x")
+ggsave(smHeightPlot, file = "~/OneDrive - University of Bergen/Research/FunCaB/paper 2/figures/Fig4b.jpg", dpi = 300, width = 8, height = 4)
+
+
 #treatment
 #### with TEMP ####
-modSMT <- SM201516 %>%
+modSMT <- smVeg %>%
   filter(!Treatment == "XC") %>% 
   mutate(Treatment = recode(Treatment, "FGB" = "aFGB")) %>%
   do({
-    mod <- lmer(SM ~ scale(Temp)*Treatment +  (1|siteID/block), REML = FALSE, data = .)
+    mod <- lmer(SM ~ scale(tempLevel)*Treatment +  (1|siteID/blockID), REML = FALSE, data = .)
     tidy(mod)}) %>%  
   mutate(lower = (estimate - std.error*1.96),
-         upper = (estimate + std.error*1.96)) %>%
-  as.data.frame()
+         upper = (estimate + std.error*1.96))
 
 coefPlotsmT <- modSMT %>%
   filter(!term %in% c("(Intercept)")) %>% 

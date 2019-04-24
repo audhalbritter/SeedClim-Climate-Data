@@ -1,43 +1,109 @@
 #### #### #### #### #### 
 #### biomass #### 
-bio <- read.csv(file = "/Volumes/fja062/PhD/Data/biomass/Removal_Biomass_151617.csv", sep = ";")
-bio15 <- read_excel("/Volumes/fja062/PhD/Data/biomass/biomass_2015.xlsx")
+# load packages
+library(broom)
 
-bio15 <- bio15 %>% 
-  mutate(siteID = plyr::mapvalues(Site, from = dict_Site$v2, to = dict_Site$new)) %>% 
-  select(-Site)
+# read in biomass files
+bio15 <- read_excel("~/OneDrive - University of Bergen/Research/FunCaB/Data/veg_biomass/biomass_removals_2015.xlsx")
 
+biomass <- bio15 %>%
+  filter(!Treatment %in% c("RTC", "RTC2nd")) %>% 
+  left_join(dict_Site, by = c("Site" = "old")) %>% 
+  select(-c(Site, Round, Year, v2, v3), "siteID" = new, "blockID" = Block, "turfID" = TurfID, "functionalGroup" = Func_group)
 
+# vegetation data
+comp2 <- comp2 %>% 
+  filter(!is.na(Treatment), !Treatment == "XC")
 
-biomass <- bio %>%
-  mutate(siteID = plyr::mapvalues(Site, from = dict_Site$old, to = dict_Site$new)) %>% 
-  bind_rows(bio15) %>% 
-  group_by(Year, siteID, Treatment, Func_group, Block) %>% 
-  mutate(biomass_sum = sum(Biomass_g)) %>%
-  group_by(Year, siteID, Treatment, Func_group) %>% 
-  mutate(biomass_mean = mean(biomass_sum)) %>% 
-  mutate(Block = as.character(Block)) %>% 
-  select(-Site, -Date) %>% 
-  ungroup() %>% 
-  mutate(Temperature_level = if_else(siteID %in% c("Lavisdalen", "Gudmedalen", "Skjellingahaugen", "Ulvhaugen"), "6.5",
-                                     if_else(siteID %in% c("Alrust", "Hogsete", "Rambera", "Veskre"), "8.5", "10.5"))) %>% 
-  mutate(Precipitation_level = if_else(siteID %in% c("Alrust", "Fauske", "Ulvhaugen"), "0.6",
-                                       if_else(siteID %in% c("Lavisdalen","Hogsete", "Vikesland"), "1.2",
-                                               ifelse(siteID %in% c("Rambera", "Gudmedalen", "Arhelleren"), "2.0", "2.7")))) %>%
-  mutate(Precipitation_level = as.numeric(Precipitation_level), Temperature_level = as.numeric(Temperature_level)) %>% 
-  distinct(Year, Block, Treatment, Func_group, .keep_all = TRUE)
+# FIX THIS!!!
+# set covers and heights to zero in removed plots
+comp2 <- comp2 %>% 
+  mutate(mossCov = if_else(grepl("B", Treatment) & Year > 2015, 0, mossCov),
+         forbCov = if_else(grepl("F", Treatment) & Year > 2015, 0, forbCov),
+         graminoidCov = if_else(grepl("G", Treatment) & Year > 2015, 0, graminoidCov),
+         vegetationHeight = if_else(Treatment == "FGB" & Year > 2015, 0, vegetationHeight),
+         mossHeight = if_else(Treatment == "FGB" & Year > 2015, 0, mossHeight))
 
+composition2015 <- comp2 %>% 
+  filter(Year == 2015) %>% 
+  left_join(mossHeight, by = "turfID", suffix = c("", ".new")) %>% 
+  mutate(mossHeight = if_else(is.na(mossHeight), mossHeight.new, mossHeight),
+         blockID = as.character(blockID)) %>%
+  distinct(siteID, Treatment, turfID, blockID, vegetationHeight, mossHeight, litter, mossCov, forbCov, graminoidCov) %>% 
+  ungroup()
 
+composition2015 <- composition2015 %>%
+  group_by(siteID, blockID) %>% 
+  mutate(mossHeight = mean(mossHeight, na.rm = TRUE))
 
-biomass %>% 
-  filter(Year == 2015) %>%
-  #filter(Treatment %in% c("C", "FGB", "F", "G", "B")) %>%
-  ggplot(aes(x = Treatment, y = Biomass_g, fill = Func_group)) +
-  geom_col() +
-  facet_grid(Precipitation_level ~ Temperature_level) +
-  #scale_fill_manual(values = cbPalette[c(3, 8, 4)], labels = c("Bryophyte", "Forb", "Graminoid"), name = "Removal") +
-  labs(y = "Removed biomass (g)") +
-  theme_classic() +
-  axis.dim 
-ggsave(filename = "removed_biomass_2016.jpg", path = "/Users/fja062/Documents/seedclimComm/figures/", dpi = 300, width = 6.5, height = 6.5)
+# gather vegetation into columns for join with biomass
+biomassComp <- composition2015 %>% 
+  gather(graminoidCov, forbCov, mossCov, key = "functionalGroup", value = "covValue") %>% 
+  mutate(functionalGroup = recode(functionalGroup, "mossCov" = "bryophyte", "graminoidCov" = "graminoid", "forbCov" = "forb"))
+  
+# align naming conventions among vegetation and biomass datasets
+# join biomass data to composition data
+biomassReg <- biomass %>% 
+  mutate(blockID = as.character(if_else(siteID == "Gudmedalen", recode(blockID, "1" = 5, "2" = 12, "3" = 13, "4" = 15), blockID)),
+         turfID = if_else(siteID == "Gudmedalen", paste0(substr(siteID, 1, 3), blockID, Treatment), turfID),
+         turfID = recode(turfID, "Alr4FGB" = "Alr5C"),
+         functionalGroup = recode(functionalGroup, "B" = "bryophyte", "G" = "graminoid", "F" = "forb")) %>% 
+  left_join(composition2015)
 
+# turn biomass from g to g/m^2
+biomassReg <- biomassReg %>% 
+  mutate(Biomass_gm = Biomass_g/0.0625) %>% 
+  spread(key = functionalGroup, value = Biomass_gm) %>% 
+  select(-Biomass_g, -litter)
+
+# run and extract regressions for each Functional group with zero intercept
+# forb
+forbRegCoef <- biomassReg %>% 
+  lm(forb ~ 0 + forbCov + vegetationHeight, data = .)
+forbRegCoef <- tidy(forbRegCoef)
+
+# graminoid
+gramRegCoef <- biomassReg %>% 
+  lm(graminoid ~ 0 + graminoidCov + vegetationHeight, data = .)
+gramRegCoef <- tidy(gramRegCoef)
+
+# moss
+mossRegCoef <- biomassReg %>% 
+  lm(bryophyte ~ 0 + mossCov + mossHeight, data = .)
+mossRegCoef <- tidy(mossRegCoef)
+
+# bind model estimates together
+regCoef <- bind_rows("forb" = forbRegCoef, "graminoid" = gramRegCoef, "bryophyte" = mossRegCoef, .id = "functionalGroup") %>% 
+  select(estimate, term, functionalGroup)
+
+heightMoss <- regCoef %>% filter(term %in% c("mossHeight")) %>% 
+  select(-functionalGroup) %>% 
+  spread(key = term, value = estimate)
+
+heightOther <- regCoef %>% filter(term == "vegetationHeight") %>% 
+  select(-term) %>% 
+  spread(key = functionalGroup, value = estimate)
+
+cover <- regCoef %>% filter(term %in% c("forbCov", "graminoidCov", "mossCov")) %>% 
+  select(-functionalGroup) %>% 
+  spread(key = term, value = estimate)
+
+# create biomass regressions
+biomassReg <- biomassReg %>% 
+  group_by(turfID) %>% 
+  mutate(forbCov = forbCov*cover$forbCov,
+         graminoidCov = graminoidCov*cover$graminoidCov,
+         mossCov = mossCov*cover$mossCov,
+         mossHeight = mossHeight*heightMoss$mossHeight) %>% 
+  left_join(heightOther)
+
+  left_join(regCoef, by = c("term", "functionalGroup"), suffix = c("", ".coef")) %>% 
+  group_by(functionalGroup, term, turfID) %>% 
+  mutate(coefVal = value*estimate) %>% 
+  select(-estimate, -value, -litter, -Biomass_gm, -Biomass_g)
+
+# figures #
+biomassReg %>% ggplot(aes(x = cover, y = height)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = "y ~ -1 + x") +
+  facet_grid(. ~ functionalGroup, scales = "free_x")

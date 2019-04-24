@@ -11,8 +11,10 @@
 library(lme4)
 library(tidyverse)
 library(broom)
+library(broom.mixed)
 library(lubridate)
 library(wesanderson)
+library(DHARMa)
 
 # source plotting code and soil temperature data
 source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/funcab/figures/plotting_dim.R")
@@ -21,7 +23,7 @@ load("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/ib
 
 # filter for 1st July - 31st August for analyses, gather temperature calculationg, and recode FGB to be intercept
 maxmin_a <- maxmin %>% 
-  filter(between(date, left = dmy("01-07-2015"), right = dmy("20-10-2015"))) %>% 
+  filter(between(date, left = dmy("01-07-2015"), right = dmy("01-10-2015"))) %>% 
   #gather(meanTemp, maxTemp, minTemp, magTemp, key = "temp", value = "value") %>% 
   mutate(Year = year(date),
          Treatment = recode(Treatment, "FGB" = "aFGB"))
@@ -43,7 +45,7 @@ Cover <- maxmin_a %>%
 #And if so, is one more important than another?
 #treatment as predictor
 
-maxmin_a %>% filter(temp == "maxTemp") %>% ggplot(aes(x = Treatment, y = value, colour = Treatment)) +
+maxmin_a %>% ggplot(aes(x = Treatment, y = maxTemp, colour = Treatment)) +
   geom_boxplot() +
   #stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = 0.6), geom = "line", size = 1) +
   facet_grid(tempLevel~precipLevel)  
@@ -109,39 +111,46 @@ ggsave(plotmodTreat1, file = "~/OneDrive - University of Bergen/Research/FunCaB/
 #Ie, removing x% of any functional group has the same effect, regardless of the functional group?
 
 ### ---- cover ---- ###
-modGramCov <- Cover %>%
-  filter(Treatment %in% c("B","F","C","FB")) %>%
-  lmer(maxTemp ~ sgraminoidCov*sTemp70*sPrecip70*sunniness + (1|siteID/blockID), data = .)
+CoverG <- Cover %>% 
+  select(-mossHeight, -smossHeight, -ID, -TOD, -Year, -month, -weather, -vegInt, -vegcov, -forbCov, -sforbCov, -mossCov, -smossCov, -vegetationHeight, -svegetationHeight) %>% 
+  filter(Treatment %in% c("B","F","C","FB")) %>% na.omit()
+modGramCov <- lmer(maxTemp ~ sgraminoidCov*sTemp70*sPrecip70*sunniness + (1|siteID/blockID), data = CoverG)
+
+plot(simulateResiduals(modGramCov))
+plotResiduals(CoverG$sPrecip70, simRes$scaledResiduals)
+testZeroInflation(simRes)
+
 plot(modGramCov)
 require('lattice'); qqmath(modGramCov)
 modGramCov <- tidy(modGramCov)
 
-modForbCov <- Cover %>% 
-  filter(Treatment %in% c("B","G","C","GB")) %>%
-  lmer(maxTemp ~ sforbCov*sTemp70*sPrecip70*sunniness + (1|siteID/blockID), data = .)
-plot(modForbCov)
+CoverF <- Cover %>% 
+  select(-mossHeight, -smossHeight, -ID, -TOD, -Year, -month, -weather, -vegInt, -vegcov, -graminoidCov, -sgraminoidCov, -mossCov, -smossCov, -vegetationHeight, -svegetationHeight) %>%
+  filter(Treatment %in% c("B","G","C","GB")) %>% na.omit()
+modForbCov <- lmer(maxTemp ~ sforbCov*sTemp70*sPrecip70*sunniness + (1|siteID/blockID), data = CoverF)
+plot(simulateResiduals(modForbCov))
 qqmath(modForbCov)
 modForbCov <- tidy(modForbCov)
 
-modMossCov <- Cover %>% 
-  filter(Treatment %in% c("G","F","C","GF")) %>%
-  lmer(maxTemp ~ smossCov*sTemp70*sPrecip70*sunniness + (1|siteID/blockID), data = .)
-plot(modMossCov)
+CoverM <- Cover %>% 
+  select(-mossHeight, -smossHeight, -ID, -TOD, -Year, -month, -weather, -vegInt, -vegcov, -graminoidCov, -sgraminoidCov, -forbCov, -sforbCov, -vegetationHeight, -svegetationHeight)%>% filter(Treatment %in% c("G","F","C","GF")) %>% na.omit()
+modMossCov <- lmer(maxTemp ~ smossCov*sTemp70*sPrecip70*sunniness + (1|siteID/blockID), data = CoverM)
+plot(simulateResiduals(modMossCov))
 qqmath(modMossCov)
 modMossCov <- tidy(modMossCov)
 
 ### ---- height ---- ###
-modVegH <- Cover %>% 
-  filter(Treatment %in% c("B","F","G","C","FB","GB")) %>%
-  lmer(maxTemp ~ svegetationHeight*sTemp70*sPrecip70*sunniness + (1|siteID/blockID), data = .)
-plot(modVegH) 
+CoverVH <- Cover %>% 
+  select(-mossHeight, -smossHeight, -ID, -TOD, -Year, -month, -weather, -vegInt, -vegcov, -graminoidCov, -sgraminoidCov, -mossCov, -smossCov, -forbCov, -sforbCov) %>% filter(Treatment %in% c("B","F","G","C","FB","GB")) %>% na.omit()
+modVegH <- lmer(maxTemp ~ svegetationHeight*sTemp70*sPrecip70*sunniness + (1|siteID/blockID), data = CoverVH)
+plot(simulateResiduals(modVegH)) 
 qqmath(modVegH)
 modVegH <- tidy(modVegH)
 
-modMossH <- Cover %>% 
-  filter(Treatment %in% c("GF","F","G","C")) %>%
-  lmer(maxTemp ~ smossHeight*sTemp70*sPrecip70*sunniness + (1|siteID/blockID), data = .)
-plot(modMossH)
+CoverMH <- Cover %>% 
+  select(-forbCov, -sforbCov, -ID, -TOD, -Year, -month, -weather, -vegInt, -vegcov, -graminoidCov, -sgraminoidCov, -mossCov, -smossCov, -vegetationHeight, -svegetationHeight) %>% filter(Treatment %in% c("GF","F","G","C")) %>% na.omit()
+modMossH <- lmer(maxTemp ~ smossHeight*sTemp70*sPrecip70*sunniness + (1|siteID/blockID), data = CoverMH)
+plot(simulateResiduals(modMossH))
 qqmath(modMossH)
 modMossH <- tidy(modMossH)
 
@@ -165,7 +174,7 @@ allMod <- all %>%
          term = gsub(":", " x ", term)
          )
 
-allMod %>% 
+modCovPlot <- allMod %>% 
   filter(model %in%c("gramCov", "forbCov", "mossCov")) %>% 
   ggplot(aes(x = term, y = estimate, ymin = lower, ymax = upper)) +
   geom_errorbar(width = 0, position = position_dodge(width = 0.5)) +
@@ -177,7 +186,10 @@ allMod %>%
   facet_wrap(~ model, scales = "free_y") +
   theme(axis.title.y = element_blank())
 
-allMod %>% 
+ggsave(modCovPlot, file = "~/OneDrive - University of Bergen/Research/FunCaB/paper 2/figures/supFig1.jpg", dpi = 300, width = 10, height = 4)
+
+
+modHeiPlot <- allMod %>% 
   filter(model %in%c("vegH", "mossH")) %>% 
   ggplot(aes(x = term, y = estimate, ymin = lower, ymax = upper)) +
   geom_errorbar(width = 0, position = position_dodge(width = 0.5)) +
@@ -190,15 +202,12 @@ allMod %>%
   theme(axis.title.y = element_blank())
 
 
-ggsave(vegCompmod1plotCALL, file = "~/OneDrive - University of Bergen/Research/FunCaB/paper 2/figures/fig3A.jpg", dpi = 300, width = 6, height = 4)
+ggsave(modHeiPlot, file = "~/OneDrive - University of Bergen/Research/FunCaB/paper 2/figures/supFig2.jpg", dpi = 300, width = 8.5, height = 4)
 
 allMod %>% 
   select(-(group:upper)) %>% 
   filter(!is.na(term)) %>% 
   mutate(estimate = round(estimate, 3), std.error = round(std.error, 3), statistic = round(statistic, 3)) %>% 
-  gather(estimate, std.error, statistic, key = output, value = value) %>% 
-  unite(cols, model, output) %>% 
-  spread(key = cols, value = value) %>% 
   write_csv(., path = "~/OneDrive - University of Bergen/Research/FunCaB/paper 2/data/mod1-6OUT.csv")
 
 
@@ -217,21 +226,60 @@ FD  <- FD %>%
          svegetationHeight = scale(vegetationHeight),
          smossHeight = scale(mossHeight))
 
-modFD <- FD %>% 
-  lmer(sum ~ Treatment*sTemp70*sPrecip70 + (1|siteID/blockID), REML = FALSE, data = .)
+modFDg <- FD %>% 
+  filter(Treatment %in% c("F", "B", "FB", "C", "FGB")) %>% 
+  glmmTMB(sum ~ sgraminoidCov*sTemp70*sPrecip70 + (1|siteID/blockID), zi = ~ 1, family = "poisson", data = .)
 
-modFD <- tidy(modFD)
+simulationOutput <- simulateResiduals(modFD, n = 250)
+plot(simulationOutput)
+testZeroInflation(simulationOutput)
+summary(modFDg)
+fixef(modFDg)
+modFDg <- tidy(modFDg)
 
-modFD <- FD %>%
-  filter(Treatment %in% c("B","F","C","FB")) %>%
-  do({
-    mod <- lmer(sum ~ scale(graminoidCov)*scale(temp7010)*scale(precip7010) + (1|siteID/blockID), REML = FALSE, data = .)
-    tidy(mod)
-  })
+modFDf <- FD %>% 
+  filter(Treatment %in% c("G", "B", "GB", "C", "FGB")) %>% 
+  glmmTMB(sum ~ sforbCov*sTemp70*sPrecip70 + (1|siteID/blockID), zi = ~ 1, family = "poisson", data = .)
+simulationOutput <- simulateResiduals(modFDf, n = 250)
+plot(simulationOutput)
+testZeroInflation(simulationOutput)
+summary(modFDf)
+modFDf <- tidy(modFDf)
 
-allMod <- modFD %>% 
-  filter(!grepl("^sd_", term),
-         !term == "(Intercept)") %>% 
+modFDm <- FD %>% 
+  filter(Treatment %in% c("G", "F", "GF", "C", "FGB")) %>% 
+  glmmTMB(sum ~ smossCov*sTemp70*sPrecip70 + (1|siteID/blockID), zi = ~ 1, family = "poisson", data = .)
+simulationOutput <- simulateResiduals(modFDm, n = 250)
+plot(simulationOutput)
+testZeroInflation(simulationOutput)
+summary(modFDm)
+modFDm <- tidy(modFDm)
+
+modFDvH <- FD %>% 
+  filter(Treatment %in% c("G", "F", "B", "GB", "FB", "C", "FGB")) %>% 
+  glmmTMB(sum ~ svegetationHeight*sTemp70*sPrecip70 + (1|siteID/blockID), zi = ~ 1, family = "poisson", data = .)
+simulationOutput <- simulateResiduals(modFDvH, n = 250)
+plot(simulationOutput)
+testZeroInflation(simulationOutput)
+summary(modFDvH)
+modFDvH <- tidy(modFDvH)
+
+
+modFDmH <- FD %>% 
+  filter(Treatment %in% c("G", "F", "GF", "C", "FGB")) %>% 
+  glmmTMB(sum ~ smossHeight*sTemp70*sPrecip70 + (1|siteID/blockID), zi = ~ 1, family = "poisson", data = .)
+simulationOutput <- simulateResiduals(modFDvH, n = 250)
+plot(simulationOutput)
+testZeroInflation(simulationOutput)
+summary(modFDmH)
+modFDmH <- tidy(modFDmH)
+
+allFDmod <- bind_rows("gramCov" = modFDg, "forbCov" = modFDf, "mossCov" = modFDm, "mossH" = modFDmH, "vegH" = modFDvH, .id = "model") #%>% 
+  mutate(lower = (estimate - std.error*1.96),
+         upper = (estimate + std.error*1.96))
+
+allFDmod <- allFDmod %>% 
+  filter(!grepl("^sd_", term)) %>% 
   mutate(term = gsub("sgraminoidCov", "graminoid", term),
          term = gsub("sforbCov", "forb", term),
          term = gsub("svegetationHeight", "vascular plant", term),
@@ -239,19 +287,14 @@ allMod <- modFD %>%
          term = gsub("smossCov", "moss", term),
          term = gsub("sPrecip70", "P", term),
          term = gsub("sTemp70", "t", term),
-         term = gsub("sunniness", "UV", term),
          #term = gsub("(Intercept)", "bare ground", term),
          term = gsub(":", " x ", term)
   )
 
-modFD %>% 
-  select(-(group:upper)) %>% 
+allFDmod %>% 
   filter(!is.na(term)) %>% 
-  mutate(estimate = round(estimate, 3), std.error = round(std.error, 3), statistic = round(statistic, 3)) %>% 
-  gather(estimate, std.error, statistic, key = output, value = value) %>% 
-  unite(cols, model, output) %>% 
-  spread(key = cols, value = value) %>% 
-  write_csv(., path = "~/OneDrive - University of Bergen/Research/FunCaB/paper 2/data/mod1-6OUT.csv")
+  mutate(estimate = round(estimate, 3), std.error = round(std.error, 3), statistic = round(statistic, 3), p.value = round(p.value, 4)) %>% 
+  write_csv(., path = "~/OneDrive - University of Bergen/Research/FunCaB/paper 2/data/modFD1-6OUT.csv")
 
 P85 <- FD %>% mutate(Precip = Precip*1.17)
 t85 <- FD %>% mutate(Temp = Temp + 3.9)

@@ -126,7 +126,7 @@ trial <- mdat %>%
 # setdiff(dictionary$ID, trial$ID) <- what's in dictionary that's not in trial
 # need to fix 2017 data = seems to be a lot missing from the dictionary
 
-trial <- trial %>% 
+soilTemp <- trial %>% 
   mutate(Year = as.numeric(Year)) %>% 
   left_join(dictionary, by = c("ID", "siteID")) %>%
   select(-iButtonID.x, -iButtonID.y, -Year.x) %>% 
@@ -135,24 +135,26 @@ trial <- trial %>%
   filter(!Block %in% c("E5", "E2", "E9"))
 
 # find out who the problematic ones are
-trial %>% filter(is.na(Year)) %>% distinct(siteID, ID) %>% View()
+soilTemp %>% filter(is.na(Year)) %>%
+  filter(siteID == "Skjellingahaugen") %>% #distinct(siteID, ID, .keep_all = TRUE) %>% 
+  ggplot(aes(x = Date, y = Value)) + geom_point() + facet_wrap(~siteID)
 
 # Check start and end date
-trial %>% 
+soilTemp %>% 
   group_by(Year, siteID) %>% 
   summarise(min(Date, na.rm = TRUE), max(Date, na.rm = TRUE)) %>% 
   arrange(siteID) %>% print(n = Inf)
 
 # Remove ibuttons that are apparently logging until December 2017
-wonkyiButtons <- trial %>% 
+wonkyiButtons <- soilTemp %>% 
   filter(Date > "2017-09-01 00:07:01") %>% 
   distinct(ID) %>% 
   pull(ID)
 
-#trial %>% filter(ID %in% wonkyiButtons) %>% ggplot(aes(x = Date, y = Value)) + geom_line() + facet_wrap(~ siteID)
+#soilTemp %>% filter(ID %in% wonkyiButtons) %>% ggplot(aes(x = Date, y = Value)) + geom_point() + facet_wrap(~ siteID)
 
 #Clean logger data to remove broken loggers and values before loggers were placed
-iButtonData <- trial %>% 
+iButtonData <- soilTemp %>% 
   filter(!ID %in% wonkyiButtons) %>% 
   #filter(!ID %in% c("3E369341.csv_2016", "3E3DF841.csv_2016")) %>% # remove 2 iButtons from Gudmeldalen; these loggers need to be checked!!!
   filter(!(Date < ReplacementDate & grepl("2016", ID))) %>%  # remove values in 2015 before ibuttons have been placed
@@ -161,12 +163,6 @@ iButtonData <- trial %>%
   filter(!(Date > RemovalDate & grepl("2017", ID))) %>% 
   filter(!is.na(Treatment)) %>% 
   mutate(DOY = format(Date, "%Y-%m-%d")) %>% 
-  mutate(Temperature_level = if_else(siteID %in% c("Lavisdalen", "Gudmedalen", "Skjellingahaugen", "Ulvhaugen"), "6.5",
-                                     if_else(siteID %in% c("Alrust", "Hogsete", "Rambera", "Veskre"), "8.5", "10.5"))) %>% 
-  mutate(Precipitation_level = if_else(siteID %in% c("Alrust", "Fauske", "Ulvhaugen"), "0.6",
-                                       if_else(siteID %in% c("Lavisdalen","Hogsete", "Vikesland"), "1.2",
-                                               ifelse(siteID %in% c("Rambera", "Gudmedalen", "Arhelleren"), "2.0", "2.7")))) %>%
-  mutate(Precipitation_level = as.numeric(Precipitation_level), Temperature_level = as.numeric(Temperature_level)) %>% 
   mutate(turfID = paste0(substr(siteID,1,3), Block, Treatment)) %>% 
   select(-Unit) %>% 
   filter(!(ID == "3E3DF841_2016" & format(Date, "%Y-%m-%d") > "2016-04-25" & format(Date, "%Y-%m-%d") < "2016-05-26"),
@@ -191,29 +187,21 @@ iButtonData <- iButtonData %>%
 ##### save and load ibutton data #######
 save(iButtonData, file = "~/OneDrive - University of Bergen/Research/FunCaB/Data/iButton2015-2017.RData")
 
-iButtonData %>%
-  #filter(Temperature_level == 8.5, Precipitation_level == 2.7, Date < "2016-08-01 00:00:00") %>% 
-  ggplot(aes(x = Date, y = Value, colour = Treatment)) +
-  geom_point(size = 2) +
-  facet_grid(Temperature_level ~ Precipitation_level) +
-  scale_color_brewer(palette = "Dark2") +
-  theme_bw()
-
-
 # yday ===> DOY
 
-######### UVB LOGGER ###########
+#### --- UVB LOGGER --- ####
 
 # read in UVB data
 # source the Functions_ReadInSeedClimClimate script
 source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/funcab/climate/uv/Functions_ReadInUVBData.R")
 
-uvb <- ImportData(site = c("Ovstedal", "Arhelleren", "Veskre", "Skjellingahaugen", "Rambera", "Fauske", "Alrust", "Ulvhaugen", "Vikesland", "Hogsete", "Lavisdalen", "Gudmedalen"))
+UVB <- ImportData(site = c("Ovstedal", "Arhelleren", "Veskre", "Skjellingahaugen", "Rambera", "Fauske", "Alrust", "Ulvhaugen", "Vikesland", "Hogsete", "Lavisdalen", "Gudmedalen"))
 
 
-uvb <- uvb %>%
+uvb <- UVB %>%
   filter(!logger %in% c("power", "voltage2", "resistance1", "resistance2", "counter1", "counter2")) %>% 
-  filter(value < 3.3) %>%
+  filter(value < 2.6) %>%
+  filter(!(site == "skj" & value > 1)) %>% 
   filter(format(date, "%Y-%m-%d") > "2015-06-15") 
 
 # summarise data to get one uvb value per hour.
@@ -258,6 +246,10 @@ sunniness <- sunniness %>%
   mutate(sunniness = if_else(is.na(sunniness.old), sunniness.alt, sunniness.old)) %>%
   select(- sunniness.alt, - pref, - alternative)
   
+gud <- sunniness %>% 
+  filter(siteID == "Lavisdalen", format(date, "%Y-%m-%d") < "2015-09-08") %>%
+  mutate(siteID = case_when(
+    siteID == "Lavisdalen" ~ "Gudmedalen"))
 
 UlvSkj <- sunniness %>% 
   filter(siteID %in% c("Alrust", "Rambera")) %>% 
@@ -267,7 +259,9 @@ UlvSkj <- sunniness %>%
   ))
 
 sunniness <- sunniness %>% 
-  bind_rows(UlvSkj)
+  filter(!siteID %in% c("Ulvhaugen", "Skjellingahaugen"), !(siteID == "Gudmedalen" & format(date, "%Y-%m-%d") < "2015-09-08")) %>% 
+  bind_rows(UlvSkj) %>% 
+  bind_rows(gud)
 
 
 
@@ -307,7 +301,7 @@ soilTemp <- iButtonData %>%
     hour %in% c(19,20,7,8,9) ~ "spinup"))
 
 soilTemp <- climate %>% 
-  left_join(soilTemp) %>% 
-  filter(!turfID == "Lav3GF") # removed due to irregular logging
+  left_join(soilTemp) #%>% 
+  #filter(!turfID == "Lav3GF") # removed due to irregular logging
 
 save(soilTemp, file = "~/OneDrive - University of Bergen/Research/FunCaB/Data/soilTemp.RData")
