@@ -4,7 +4,7 @@
 library(broom)
 
 # read in biomass files
-bio15 <- read_excel("~/OneDrive - University of Bergen/Research/FunCaB/Data/veg_biomass/biomass_removals_2015.xlsx")
+bio15 <- read_excel("~/OneDrive - University of Bergen/Research/FunCaB/Data/primary/veg_biomass/biomass_removals_2015.xlsx")
 
 biomass <- bio15 %>%
   filter(!Treatment %in% c("RTC", "RTC2nd")) %>% 
@@ -52,58 +52,40 @@ biomassReg <- biomass %>%
 
 # turn biomass from g to g/m^2
 biomassReg <- biomassReg %>% 
-  mutate(Biomass_gm = Biomass_g/0.0625) %>% 
-  spread(key = functionalGroup, value = Biomass_gm) %>% 
-  select(-Biomass_g, -litter)
+  mutate(Biomass_gm = Biomass_g/0.0625) 
 
 # run and extract regressions for each Functional group with zero intercept
 # forb
 forbRegCoef <- biomassReg %>% 
-  lm(forb ~ 0 + forbCov + vegetationHeight, data = .)
+  filter(functionalGroup == "forb") %>% 
+  lm(Biomass_gm ~ 0 + forbCov:vegetationHeight, data = .)
 forbRegCoef <- tidy(forbRegCoef)
 
 # graminoid
 gramRegCoef <- biomassReg %>% 
-  lm(graminoid ~ 0 + graminoidCov + vegetationHeight, data = .)
+  filter(functionalGroup == "graminoid") %>% 
+  lm(Biomass_gm ~ 0 + graminoidCov:vegetationHeight, data = .)
 gramRegCoef <- tidy(gramRegCoef)
 
 # moss
 mossRegCoef <- biomassReg %>% 
-  lm(bryophyte ~ 0 + mossCov + mossHeight, data = .)
+  filter(functionalGroup == "bryophyte") %>% 
+  lm(Biomass_gm ~ 0 + mossCov:mossHeight, data = .)
 mossRegCoef <- tidy(mossRegCoef)
 
 # bind model estimates together
 regCoef <- bind_rows("forb" = forbRegCoef, "graminoid" = gramRegCoef, "bryophyte" = mossRegCoef, .id = "functionalGroup") %>% 
-  select(estimate, term, functionalGroup)
+  select(estimate, functionalGroup) %>% 
+  spread(estimate, key = functionalGroup)
 
-heightMoss <- regCoef %>% filter(term %in% c("mossHeight")) %>% 
-  select(-functionalGroup) %>% 
-  spread(key = term, value = estimate)
 
-heightOther <- regCoef %>% filter(term == "vegetationHeight") %>% 
-  select(-term) %>% 
-  spread(key = functionalGroup, value = estimate)
-
-cover <- regCoef %>% filter(term %in% c("forbCov", "graminoidCov", "mossCov")) %>% 
-  select(-functionalGroup) %>% 
-  spread(key = term, value = estimate)
-
-# create biomass regressions
 biomassReg <- biomassReg %>% 
-  group_by(turfID) %>% 
-  mutate(forbCov = forbCov*cover$forbCov,
-         graminoidCov = graminoidCov*cover$graminoidCov,
-         mossCov = mossCov*cover$mossCov,
-         mossHeight = mossHeight*heightMoss$mossHeight) %>% 
-  left_join(heightOther)
+  select(-functionalGroup, - Biomass_g, -Biomass_gm, -litter) %>% 
+  full_join(composition2015 %>% select(-litter)) %>% 
+  group_by(siteID, blockID, turfID, Treatment) %>% 
+  mutate(forbBiomass = forbCov*vegetationHeight*regCoef$forb,
+         graminoidBiomass = graminoidCov*vegetationHeight*regCoef$graminoid,
+         mossBiomass = mossCov*mossHeight*regCoef$bryophyte) %>% 
+  distinct() %>% 
+  select(blockID, Treatment, turfID, siteID, forbBiomass, graminoidBiomass, mossBiomass, forbCov, graminoidCov, mossCov, vegetationHeight, mossHeight)
 
-  left_join(regCoef, by = c("term", "functionalGroup"), suffix = c("", ".coef")) %>% 
-  group_by(functionalGroup, term, turfID) %>% 
-  mutate(coefVal = value*estimate) %>% 
-  select(-estimate, -value, -litter, -Biomass_gm, -Biomass_g)
-
-# figures #
-biomassReg %>% ggplot(aes(x = cover, y = height)) +
-  geom_point() +
-  geom_smooth(method = "lm", formula = "y ~ -1 + x") +
-  facet_grid(. ~ functionalGroup, scales = "free_x")

@@ -7,7 +7,7 @@ source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/
 source("~/OneDrive - University of Bergen/Research/FunCaB/SeedClim-Climate-Data/funcab/vegetation/biomass_cleaning.R")
 
 # load soil temperature data
-load("~/OneDrive - University of Bergen/Research/FunCaB/Data/soilTemp.RData")
+load("~/OneDrive - University of Bergen/Research/FunCaB/Data/secondary/soilTemp.RData")
 
 #extract air temperature
 airTemp <- soilTemp %>% 
@@ -26,57 +26,49 @@ airTemp %>% filter(between(date, ymd("2015-08-01"), ymd("2015-11-30"))) %>%
   group_by(siteID) %>% 
   filter(maxTemp <= 5) %>% 
   filter(date == min(date)) %>% 
-  ggplot(aes(date, maxTemp, colour = siteID)) +
-  geom_point()
+  ggplot(aes(date, maxTemp, label = siteID)) +
+  geom_text(position = position_jitter(width = 1, height = 1))
 # cut-off date: 20 Oct 2015.
 
 #summarise to mean daily temp
-soilTemp <- soilTemp %>%
+soilTempPlot <- soilTemp %>%
   ungroup() %>% 
   filter(between(date, ymd("2015-07-01"), ymd("2016-08-30")), !Treatment == "temp200cm", !TOD == "spinup") %>% 
+  mutate(turfID = recode(turfID, "GudNAGB" = "Gud13GB"),
+         Block = if_else(turfID == "Gud13GB", "13", Block))
+
+soilTemp <- soilTempPlot %>% 
   group_by(siteID, turfID, blockID = Block, Treatment, date, sunniness, TOD, ID) %>%
   summarise(meanTemp = mean(Value),
             maxTemp = max(Value),
             minTemp = min(Value),
             magTemp = (maxTemp - minTemp)) %>% 
-  ungroup() %>% 
-  mutate(turfID = recode(turfID, "GudNAGB" = "Gud13GB"),
-         blockID = if_else(turfID == "Gud13GB", "13", blockID))
-
-biomassReg %>% filter(term == "covValue") %>% 
-  spread(key = functionalGroup, value = coefVal)
+  ungroup()
 
 
 vegComp <- soilTemp  %>%
-  #left_join(composition2015, by = c("siteID", "blockID", "turfID", "Treatment")) %>% 
   left_join(biomassReg) %>%
   group_by(turfID) %>% 
   distinct(siteID, turfID, blockID, Treatment, date, sunniness, TOD, meanTemp, .keep_all = TRUE) %>% 
-  mutate(vegcov = case_when(
-    Treatment == "G" ~ mossCov + forbCov,
-    Treatment == "F" ~ mossCov + graminoidCov,
-    Treatment == "B" ~ graminoidCov + forbCov,
-    Treatment == "GF" ~ mossCov,
-    Treatment == "GB" ~ forbCov,
-    Treatment == "FB" ~ graminoidCov,
-    Treatment == "FGB" ~ 0,
-    Treatment == "C" ~ mossCov + forbCov + graminoidCov
-  )) %>% 
   filter(TOD == "day")
 
 # turn covers to zero where FG has been removed
 vegComp <- vegComp %>% 
-  mutate(forbCov = if_else(Treatment %in% c("F", "FB", "GF", "FGB"), 0, forbCov), 
+  mutate(forbBiomass = if_else(Treatment %in% c("F", "FB", "GF", "FGB"), 0, forbBiomass),
+         graminoidBiomass = if_else(Treatment %in% c("G", "GF", "GB", "FGB"), 0, graminoidBiomass),
+         mossBiomass = if_else(Treatment %in% c("B", "GB", "FB", "FGB"), 0, mossBiomass),
+         forbCov = if_else(Treatment %in% c("F", "FB", "GF", "FGB"), 0, forbCov),
          graminoidCov = if_else(Treatment %in% c("G", "GF", "GB", "FGB"), 0, graminoidCov),
-         vegetationHeight = if_else(Treatment %in% c("GF", "FGB"), 0, vegetationHeight),
-         mossHeight = if_else(Treatment %in% c("B" ,"GB", "FGB"), 0, mossHeight))
+         mossCov = if_else(Treatment %in% c("B", "GB", "FB", "FGB"), 0, mossCov),
+         mossHeight = if_else(Treatment %in% c("B", "GB", "FB", "FGB"), 0, mossHeight),
+         vegetationHeight = if_else(Treatment %in% c("GF", "FGB"), 0, vegetationHeight))
 
 # categorise weather and filter for summer months
 vegComp <- vegComp %>% 
   mutate(weather = case_when(
-    sunniness > 0.6 ~ "sunny",
-    sunniness > 0.3 ~ "variable",
-    sunniness < 0.3 ~ "cloudy")) %>% 
+    sunniness > 0.66 ~ "sunny",
+    sunniness > 0.33 ~ "variable",
+    sunniness < 0.33 ~ "cloudy")) %>% 
   ungroup()
 
 
@@ -89,8 +81,7 @@ FD <- vegComp %>%
   arrange(date) %>% 
   group_by(turfID) %>% 
   mutate(sum = cumsum(x)) %>%
-  ungroup() %>% 
-  filter(date == ymd("2016-05-30"))
+  ungroup()
 
 # --- temperature anomalies ---#
 maxmin <- vegComp %>% 
@@ -110,9 +101,3 @@ magAmpAnom <- maxmin %>%
   left_join(maxmin %>% filter(Treatment == "FGB") %>% ungroup() %>% select(FGBmagTemp = magTemp, date, siteID, blockID)) %>%
   mutate(magAnom = magTemp - FGBmagTemp) %>% 
   ungroup()
-
-
-maxmin %>% 
-  filter(between(date, left = dmy("01-08-2015"), right = dmy("30-09-2015")), tempLevel == 6.5) %>% 
-  group_by(turfID, date) %>% 
-  ggplot(aes(x = date, y = maxTemp, colour = Treatment)) + stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = 0.6)) + stat_summary(fun.data = "mean_cl_boot", position = position_dodge(width = 0.6), geom = "line")
