@@ -1,57 +1,53 @@
 # History files
 .Rhistory
 .Rapp.history
-
 # Session Data files
-
 
 # Example code in package build process
 *-Ex.R
-
+*.DS_Store
 # RStudio files
 .Rproj.user/
-
+.Rbuildignore
 # produced vignettes
 vignettes/*.html
 vignettes/*.pdf
-
 # OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
 .httr-oauth
 .Rproj.user
-
-#markdown cache
+# markdown cache
 *_cache/
-
-#data
-*.xls
-*.csv
+# figures
+*.jpg
+*.gif
+*.bmp
+*.png
+*.tiff
+# output files
+*.doc
+*.docx
+*.pdf
+*.html
 *.Rdata
 *.RData
 *.rds
 *.odb
 *.zip
 *.sql
+
+#binary datafiles
+*.xls
 *.xlsx
-*.xlsx#
-*.rar
+*.mdb
+*.csv
+*.txt
 *.sqlite
-*.dat
-*.docx
-*.DS_Store
+!seedclimstructure.txt
+!speciesCorrections.csv
 
-#rasters & shapefiles
-*.bil
-*.blw
-*.hdr
-*.prj
-
-#figures & output
-*.png
-*.html
-*.pdf
-*.jpeg
-*.jpg
-.my.cnf
-
-# RDataTmp1
-*.RDataTmp
+#tmpfiles
+*~
+# compressed files
+*.zip
+*.rar
+-MBP13’s MacBook Pro.Rhistory
