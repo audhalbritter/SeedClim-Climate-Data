@@ -11,10 +11,10 @@ library("data.table")
 pn <- . %>% print(n = Inf)
 
 #### IMPORT CLIMATE DATA FOR ALL SITES ####
-source('~/Dropbox/Bergen/SeedClim Climate/SeedClim-Climate-Data/Functions_ReadInSeedClimClimateData.R')
+source('Functions_ReadInSeedClimClimateData.R')
 
 # DATA FROM OLD PLACE
-oldClimateRepo <- list.files(path = "/Volumes/felles/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site/", 
+oldClimateRepo <- list.files(path = "/Volumes/felles/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site", 
                              pattern = "txt", recursive = TRUE, full.names = TRUE) %>% 
   grep(pattern = "Notes|Notater|UVB", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
   grep(pattern = "ITAS\\d{0,4}\\.txt|ITAS-FALL-2014\\.txt", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
@@ -98,19 +98,19 @@ table(temperature$logger, temperature$site)
 table(temperature$logger, year(temperature$date))
 table(temperature$site, year(temperature$date))
 
-# plot logger by site
-plot_climate(start_date = "2008.1.1", end_date = "2017.11.1", log = c("temp1"), inc = TRUE, SITE = "Lav")
+# plot logger by site *** this isn't working for me-JSL
+#plot_climate(start_date = "2008.1.1", end_date = "2017.11.1", log = c("temp1"), inc = TRUE, SITE = "Lav")
 
 # plot single site
 temperature %>% 
-  filter(site == "Skj") %>% 
+  filter(site == "skj") %>% 
   ggplot(aes(x = date, y = value)) +
   geom_line() +
   facet_wrap(~ logger)
 
 # Find file names
 temperature %>%
-  filter(site == "Skj", logger == "") %>%
+  filter(site == "skj", logger == "") %>%
   group_by(file) %>%
   summarise(n = n(), MIN = min(date), max = max(date))
   
@@ -159,7 +159,12 @@ temperature2 <- temperature %>%
   # switch logger temp1 and temp2 always !!!
   mutate(logger = case_when(site == "fau" & logger %in% c("temp1", "thermistor 2") ~ "tempsoil",
                             site == "fau" & logger %in% c("temp2", "thermistor 1") ~ "tempabove",
-                            TRUE ~ logger))
+                            TRUE ~ logger)) %>%
+  # 2018 variance high from sun exposure-JSL
+  mutate(flag = ifelse(site == "fau" &
+                         year(date) == 2018 &
+                         logger == "tempabove",
+                       "VarianceProblem_TooHigh", flag))
 
 # check again 30cm at start!!!
 # check 2018 above ground! exposed to sun! fau, arh
@@ -168,7 +173,10 @@ temperature2 <- temperature %>%
 ## VIKESLAND
 # flag tempsoil from April 2015 - now: bias
 temperature2 <- temperature2 %>%
-  mutate(flag = ifelse(file %in% c("Vikesland_climate 20150428 - 20151007.txt", "Vikesland_climate_spring2016.txt", "Vikesland_climate_Fall2016.txt", "Vikesland_climate.txt", "Vikesland_climate_autumn2017.txt") &
+  mutate(flag = ifelse(file %in% c("Vikesland_climate 20150428 - 20151007.txt",
+                                   "Vikesland_climate_spring2016.txt",
+                                   "Vikesland_climate_Fall2016.txt", "Vikesland_climate.txt",
+                                   "Vikesland_climate_autumn2017.txt") &
                          logger == "temp2",
                        "VarianceProblem_TooHigh", flag))
 
@@ -177,7 +185,12 @@ temperature2 <- temperature2 %>%
 # switch temp1 and temp2 for July 2009 - Oct 2009
 temperature2 <- temperature2 %>% 
   mutate(logger = ifelse(file == "Arhelleren_08072009.txt" & logger == "temp1", "tempsoil", logger),
-         logger = ifelse(file == "Arhelleren_08072009.txt" & logger == "temp2", "tempabove", logger))
+         logger = ifelse(file == "Arhelleren_08072009.txt" & logger == "temp2", "tempabove", logger))%>%
+ ## flag high variacne in the the post 2018 summer temps above-sun exposure as above-JSL
+   mutate(flag = ifelse(site == "arh" &
+                           year(date) >= 2018 &
+                           logger == "tempabove",
+                         "VarianceProblem_TooHigh", flag))
 
 
 # OVSTEDAL
@@ -188,7 +201,11 @@ temperature2 <- temperature2 %>%
   mutate(value = ifelse(site == "ovs" &
                           logger %in% c("temp200cm", "temp30cm") &
                           date < ymd_hms("2009-06-28 00:00:00"),
-                        NA, value))
+                        NA, value)) %>%
+  ## assigning correct logger lables to files-JSL
+  mutate(logger = ifelse(file == "#002486_20190506_1100.txt" & logger == "temp30cm", "temp30cm", logger),
+         logger = ifelse(file == "#002473_20190506_1200.txt" & logger == "temp30cm", "temp200cm", logger))
+
 
 
 
@@ -203,7 +220,10 @@ temperature2 <- temperature2 %>%
   mutate(flag = ifelse(site == "ves" &
                          logger == "temp1" &
                          file %in% c("Veskre_climate 20150909 - 20151011.txt", "Veskre_climate.txt"),
-                       "VarianceProblem_TooLow", flag))
+                       "VarianceProblem_TooLow", flag)) %>%
+  # temperature data at veskre belongs in tempsoil-JSL
+  mutate(logger = ifelse(file %in% c("Veskre_klima.txt") &
+                           logger== "temperature", "tempsoil", logger))
 
 
 # RAMBAERA
@@ -312,10 +332,11 @@ temperature2 <- temperature2 %>%
 temperature2 <- temperature2 %>% 
   # remove double
   filter(logger != "jord-5cm") %>% 
-  # remove data from 2018, wrong values
+  # remove data from 2018, wrong values > just remove 2018
   mutate(value = ifelse(site == "gud" &
-                          logger %in% c("temperature", "temperature2"),
-                        NA, value)) %>% 
+                          logger %in% c("temperature", "temperature2") &
+                          year(date)== 2018,
+                       NA, value)) %>% 
   # switch logger until end of 2014
   mutate(logger = ifelse(site == "gud" &
                            logger == "temp1" &
@@ -329,6 +350,12 @@ temperature2 <- temperature2 %>%
                               logger == "tempabove" ~ "tempsoil",
                             file == "Gudmedalen_ITAS_140619_141013.txt" &
                               logger == "tempsoil" ~ "tempabove",
+                            TRUE ~ logger)) %>% 
+  ## temperature is tempabove and temperature2 is tempsoil in fall 2019-JSL
+  mutate(logger = case_when(file == "Gudmedalen-met1.txt" &
+                              logger == "temperature" ~ "tempabove",
+                            file == "Gudmedalen-met1.txt" &
+                              logger == "temperature2" ~ "tempsoil",
                             TRUE ~ logger)) %>% 
   # Variance problems with above logger between end of June 2014 - Oct 2014
   mutate(flag = ifelse(file == "Gudmedalen_ITAS_140619_141013.txt" &
@@ -361,7 +388,13 @@ temperature2 <- temperature2 %>%
   mutate(value = ifelse(site == "skj" &
                           logger %in% c("temp200cm", "temp30cm") &
                           date < ymd_hms("2009-06-25 00:00:00"),
+                        NA, value)) %>%
+  # one file is on a 2 second timeframe-just remove it-JSL
+  mutate(value = ifelse(site == "skj" &
+                          logger %in% c("temperature", "temperature2") &
+                          year(date)==2019,
                         NA, value))
+  #filter(!between(date, as.Date("2019-06-18"), as.Date("2019-06-20")))
 
 
 
@@ -381,7 +414,10 @@ temperature2 <- temperature2 %>%
   
   # Rename and order sites levels
   ungroup() %>% 
-  mutate(site = recode(site, "skj" = "Skjellingahaugen", "gud" = "Gudmedalen", "lav" = "Lavisdalen", "ulv" = "Ulvhaugen", "ves" = "Veskre", "ram" = "Rambera", "hog" = "Hogsete", "alr" = "Alrust", "ovs" = "Ovstedal", "arh" = "Arhelleren", "vik" = "Vikesland", "fau" = "Fauske"),
+  mutate(site = recode(site, "skj" = "Skjellingahaugen", "gud" = "Gudmedalen", 
+                       "lav" = "Lavisdalen", "ulv" = "Ulvhaugen", "ves" = "Veskre", 
+                       "ram" = "Rambera", "hog" = "Hogsete", "alr" = "Alrust", "ovs" = "Ovstedal",
+                       "arh" = "Arhelleren", "vik" = "Vikesland", "fau" = "Fauske"),
          site = factor(site, levels = c("Skjellingahaugen", "Gudmedalen", "Lavisdalen", "Ulvhaugen", "Veskre", "Rambera", "Hogsete", "Alrust", "Ovstedal", "Arhelleren", "Vikesland", "Fauske")))
 
 # fill missing dates with NA and merging with complete dataset
@@ -390,3 +426,26 @@ full_grid <- expand.grid(logger = unique(temperature2$logger), site = unique(tem
 temperature2 <- left_join(full_grid, temperature2) %>% tbl_df()
 
 save(temperature2, file = "Temperature.RData")
+
+
+# plot single site
+temperature2 %>% 
+  filter(site == "Skjellingahaugen") %>% 
+  ggplot(aes(x = date, y = value)) +
+  geom_line() +
+  facet_wrap(~ logger)
+
+
+# Find file names
+temperature %>%
+  filter(site == "skj", logger == "") %>%
+  group_by(file) %>%
+  summarise(n = n(), MIN = min(date), max = max(date))
+
+temperature %>% 
+  filter(type == "ITAS") %>% 
+  ungroup() %>% 
+  distinct(logger, site, file, Repo) %>% 
+  arrange(site, logger) %>% pn
+
+
