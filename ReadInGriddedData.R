@@ -10,8 +10,7 @@
 
 # LIBRARIES
 library("lubridate")
-library("tidyr")
-library("dplyr")
+library("tidyverse")
 library("ggplot2")
 
 # FUNCTIONS
@@ -31,16 +30,22 @@ myfiles <- list.files(path="/Volumes/FELLES/MATNAT/BIO/Ecological and Environmen
 gridclimate <- plyr::ldply(myfiles, ReadInFiles)
 head(gridclimate)
 
-climate <- gridclimate %>% 
+climate_all <- gridclimate %>% 
   # replace site names by real names
-  mutate(Site = plyr::mapvalues(Site, c("888001", "888002", "888003", "888004", "888005", "888006", "888007", "888008", "888009", "888010", "888011", "888012"), c("Alr", "Arh", "Fau", "Gud", "Hog", "Lav", "Ovs", "Ram", "Skj", "Ulv", "Ves", "Vik"))) %>% 
-  mutate(Site = factor(Site, levels = c("Ulv", "Lav", "Gud", "Skj", "Alr", "Hog", "Ram", "Ves", "Fau", "Vik", "Arh", "Ovs"))) %>% 
+  mutate(Site = plyr::mapvalues(Site, c("888001", "888002", "888003", "888004", "888005", "888006", "888007", "888008", "888009", "888010", "888011", "888012", "888191", "888192"), c("Alr", "Arh", "Fau", "Gud", "Hog", "Lav", "Ovs", "Ram", "Skj", "Ulv", "Ves", "Vik", "Joa", "Lia"))) %>% 
+  mutate(Site = factor(Site, levels = c("Ulv", "Lav", "Gud", "Skj", "Alr", "Hog", "Ram", "Ves", "Fau", "Vik", "Arh", "Ovs", "Joa", "Lia"))) %>% 
   mutate(Year = as.numeric(Year)) %>% 
   mutate(Temperature = as.numeric(Temperature), RelAirMoisture = as.numeric(RelAirMoisture), Wind = as.numeric(Wind), CloudCover = as.numeric(CloudCover), Precipitation = as.numeric(Precipitation))
 
-# Change directory
-save(climate, file = "GriddedDailyClimateData2009-2017.RData")
+climate <- climate_all %>% 
+  filter(!Site %in% c("Joa", "Lia"))
 
+climate_threeD <- climate_all %>% 
+  filter(Site %in% c("Vik", "Joa", "Lia"))
+
+# Change directory
+write_csv(climate, path = "GriddedDailyClimateData2009-2019.csv", col_names = TRUE)
+write_csv(climate_threeD, path = "THREE_D_GriddedDailyClimateData2009-2019.csv", col_names = TRUE)
 
 # Calculate Monthly Mean
 monthlyClimate <- climate %>%
