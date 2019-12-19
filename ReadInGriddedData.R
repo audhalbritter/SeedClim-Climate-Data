@@ -35,7 +35,10 @@ climate_all <- gridclimate %>%
   mutate(Site = plyr::mapvalues(Site, c("888001", "888002", "888003", "888004", "888005", "888006", "888007", "888008", "888009", "888010", "888011", "888012", "888191", "888192"), c("Alr", "Arh", "Fau", "Gud", "Hog", "Lav", "Ovs", "Ram", "Skj", "Ulv", "Ves", "Vik", "Joa", "Lia"))) %>% 
   mutate(Site = factor(Site, levels = c("Ulv", "Lav", "Gud", "Skj", "Alr", "Hog", "Ram", "Ves", "Fau", "Vik", "Arh", "Ovs", "Joa", "Lia"))) %>% 
   mutate(Year = as.numeric(Year)) %>% 
-  mutate(Temperature = as.numeric(Temperature), RelAirMoisture = as.numeric(RelAirMoisture), Wind = as.numeric(Wind), CloudCover = as.numeric(CloudCover), Precipitation = as.numeric(Precipitation))
+  mutate(Temperature = as.numeric(Temperature), RelAirMoisture = as.numeric(RelAirMoisture), Wind = as.numeric(Wind), CloudCover = as.numeric(CloudCover), Precipitation = as.numeric(Precipitation)) %>% 
+  # remove duplicates
+  distinct(Site, Year, Month, Day, Date, Temperature, RelAirMoisture, Wind, CloudCover, Precipitation) %>% 
+  as_tibble()
 
 climate <- climate_all %>% 
   filter(!Site %in% c("Joa", "Lia"))
@@ -82,7 +85,7 @@ annualClimate <- monthlyClimate %>%
   summarise(annualMean = mean(value)) %>% 
   spread(key = Logger, value = annualMean)
   
-save(monthlyClimate, annualClimate, file = paste0("GriddedMonth_AnnualClimate2009-2017", ".Rdata"))
+#save(monthlyClimate, annualClimate, file = paste0("GriddedMonth_AnnualClimate2009-2017", ".Rdata"))
 #load(file = "GriddedMonth_AnnualClimate2009-2016.RData", verbose = TRUE)
 
 

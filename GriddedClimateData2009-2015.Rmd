@@ -1,7 +1,7 @@
 ---
-title: "GriddedClimateData2009-2017"
+title: "GriddedClimateData2009-2019"
 author: "Aud Halbritter"
-date: "18.01.2017"
+date: "19.12.2019"
 output: html_document
 ---
 
@@ -11,18 +11,18 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache = TRU
 
 ```{r loadStuff, echo = FALSE}
 #Load libraries
-library("ggplot2")
-library("dplyr")
-library("tidyr")
+library("tidyverse")
+library("lubridate")
 
-#load data
-load("GriddedDailyClimateData2009-2017.Rdata")
+# read in data to R
+climate <- read_csv(file = "GriddedDailyClimateData2009-2019.csv", col_names = TRUE)
+
 ```
 
 ##  Overview
 
-Gridded data from met.no (from Ole Einar Tveito, 25.10.2016 and 17.01.2017)
-Climate data are for 12 the SeedClim / FunCaB sites from the period of 2009 - 2017, daily values
+Gridded data from met.no (from Ole Einar Tveito, 25.10.2016, 17.01.2017, 16.12.2019)
+Climate data are for 12 the SeedClim / FunCaB sites from the period of 2009 - 2019, daily values
 
 
 Climate variables are  
@@ -32,8 +32,7 @@ Climate variables are
  - Mean cloud cover (in 8 parts, no dimension, CloudCover)  
  - Precipitation (mm, Precipitation)
 
-Monthly and annual mean data for each site is available:
-GriddedMonthly_AnnualClimate2009-2017.RData
+Code for calculating monthly and annual mean data for each site is described below.
 
 
 ## Data processing
@@ -49,11 +48,50 @@ Site names were changed from a ID that was used to extranct the data to the 3 le
 
 ## Importing the data
 
-The data are provided in .Rdata files. These can be read into R with the `load` command, and ensures that dates etc are correct. The data are in a tidy format: one row - one observation. This code will load the data.
-E.g.: load("GriddedDailyClimateData2009-2017.RData", verbose=TRUE)
-load("GriddedMonthly_AnnualClimate2009-2017.RData", verbose=TRUE)
+The data are provided as a csv file on OSF (https://osf.io/npfa9/). These can be downloaded to your R project using the get_file function from the downloader package. The first time osfr and downloader need to be installed (see below). Downloader will download the data from OSF and create a folder called data_cleaned.
+The data are in a tidy format: one row - one observation. This code will load the data.
 
-```{r loadStuff, eval = FALSE} 
+```{r importData, eval = FALSE} 
+
+#remotes::install_github("centerforopenscience/osfr")
+#devtools::install_github("Between-the-Fjords/downloader")
+library("osfr")
+library("downloader")
+
+# Download data from OSF
+get_file(node = "npfa9", 
+         file = "GriddedDailyClimateData2009-2019.csv", 
+         path = "data_cleaned")
+
+# read in data to R
+climate <- read_csv(file = "data_cleaned/GriddedDailyClimateData2009-2019.csv", col_names = TRUE)
+
+```
+
+
+## Calculate monthly and annual values
+
+Code to calculate monthly and annual climate data.
+
+```{r}
+# Calculate Monthly Mean
+monthlyClimate <- climate %>%
+  select(-Year, -Month, -Day) %>% 
+  gather(key = Logger, value = value, -Site, -Date) %>% 
+  mutate(dateMonth = dmy(paste0("15-",format(Date, "%b.%Y")))) %>%
+  group_by(dateMonth, Logger, Site) %>%
+  summarise(n = n(), value = mean(value), sum = sum(value)) %>% 
+  mutate(value = ifelse(Logger == "Precipitation", sum, value)) %>% 
+  select(-n, -sum)
+
+
+# Calculate Annual Means
+annualClimate <- monthlyClimate %>% 
+  mutate(dateYear = year(dateMonth)) %>%
+  group_by(dateYear, Logger, Site) %>%
+  summarise(annualMean = mean(value)) %>% 
+  spread(key = Logger, value = annualMean)
+
 ```
 
 
@@ -62,35 +100,27 @@ load("GriddedMonthly_AnnualClimate2009-2017.RData", verbose=TRUE)
 Temperature
 
 ```{r}
-ggplot(climate, aes(x = Date, y = Temperature, color = Site)) +
+p <- ggplot(climate, aes(x = Date, y = Temperature, color = Site)) +
   geom_line() +
   scale_colour_brewer(palette="Paired") +
   facet_wrap(~ Site) + 
   theme(legend.position="none") +
   ggtitle("Temperature")
+p
 ```
-
 
 
 RelAirMoisture
 
 ```{r}
-ggplot(climate, aes(x = Date, y = RelAirMoisture, color = Site)) +
-  geom_line() +
-  scale_colour_brewer(palette="Paired") +
-  facet_wrap(~ Site) + 
-  theme(legend.position="none") +
+p + aes(y = RelAirMoisture) +
   ggtitle("Relative Air Moisture")
 ```
 
 
 Wind
 ```{r}
-ggplot(climate, aes(x = Date, y = Wind, color = Site)) +
-  geom_line() +
-  scale_colour_brewer(palette="Paired") +
-  facet_wrap(~ Site) + 
-  theme(legend.position="none") +
+p + aes(y = Wind) +
   ggtitle("Wind")
 
 ```
@@ -98,22 +128,14 @@ ggplot(climate, aes(x = Date, y = Wind, color = Site)) +
 
 CloudCover
 ```{r}
-ggplot(climate, aes(x = Date, y = CloudCover, color = Site)) +
-  geom_line() +
-  scale_colour_brewer(palette="Paired") +
-  facet_wrap(~ Site) + 
-  theme(legend.position="none") +
+p + aes(y = CloudCover) +
   ggtitle("Cloud Cover")
 ```
 
 
 Precipitation
 ```{r}
-ggplot(climate, aes(x = Date, y = Precipitation, color = Site)) +
-  geom_line() +
-  scale_colour_brewer(palette="Paired") +
-  facet_wrap(~ Site) + 
-  theme(legend.position="none") +
+p + aes(y = Precipitation) +
   ggtitle("Precipitation")
 
 ```
