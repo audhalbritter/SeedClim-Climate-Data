@@ -1,5 +1,5 @@
 ---
-title: "GriddedClimateData2009-2019"
+title: "Gridded climate data from 2009-2019"
 author: "Aud Halbritter"
 date: "19.12.2019"
 output: html_document
@@ -15,128 +15,132 @@ library("tidyverse")
 library("lubridate")
 
 # read in data to R
-climate <- read_csv(file = "GriddedDailyClimateData2009-2019.csv", col_names = TRUE)
+climate <- read_csv(file = "climate/data/GriddedDailyClimateData2009-2019.csv", col_names = TRUE)
 
 ```
 
 ##  Overview
 
-Gridded data from met.no (from Ole Einar Tveito, 25.10.2016, 17.01.2017, 16.12.2019)
-Climate data are for 12 the SeedClim / FunCaB sites from the period of 2009 - 2019, daily values
+Teh gridded climate data is provided by met.no (from Ole Einar Tveito, 25.10.2016, 17.01.2017, 16.12.2019)
+The data are daily climate data for the 12 SeedClim sites between 2009 and 2019 (will be updated).
 
 
-Climate variables are  
- - Mean daily temperature (°C, Temperature)  
- - Relative air moisture (%, RelAirMoisture)  
- - Mean wind (meter / second, Wind)  
- - Mean cloud cover (in 8 parts, no dimension, CloudCover)  
- - Precipitation (mm, Precipitation)
+The climate variables are  
+ - Mean daily temperature (°C, temperature)  
+ - Relative air moisture (%, rel_air_moisture)  
+ - Mean wind (meter / second, wind)  
+ - Mean cloud cover (in 8 parts, no dimension, cloud_cover)  
+ - Precipitation (mm, precipitation)
 
-Code for calculating monthly and annual mean data for each site is described below.
+## Raw data and processing
 
-
-## Data processing
-
-The data was provided in dat files.
-
-The raw data is stored on P:/FELLES/MATNAT/BIO/Ecological and Environmental Change/SeedClimClimateData/met-data/GriddedClimateData2009-2017
-
-Code for reading the data from the dat files is in 'ReadInGriddedData.R'. These are archived versions of the code; the working version of the code in the SeedClim-Climate-Data github repository.
-
-Site names were changed from a ID that was used to extranct the data to the 3 letter site names used in SeedClim (Gud, Lav, Vik,...). The Code for the ID's can be found on P drive.
+The raw data was provided in dat files and is stored on OSF (https://osf.io/npfa9/) as a zip file (Gridded_Climate_Data_2009-2019.zip) in the "8_Environmental_data/Raw_data" folder.
+The code to process the raw data can be found in this GitHub repo (climate/ReadInGriddedData.R).
 
 
 ## Importing the data
 
-The data are provided as a csv file on OSF (https://osf.io/npfa9/). These can be downloaded to your R project using the get_file function from the downloader package. The first time osfr and downloader need to be installed (see below). Downloader will download the data from OSF and create a folder called data_cleaned.
-The data are in a tidy format: one row - one observation. This code will load the data.
+The data are provided as a csv file on OSF (https://osf.io/npfa9/).
 
-```{r importData, eval = FALSE} 
+The data can be downloaded directly to are using the dataDownloader R package.
 
-#remotes::install_github("centerforopenscience/osfr")
-#devtools::install_github("Between-the-Fjords/downloader")
-library("osfr")
-library("downloader")
+```{r osf-download, eval=FALSE, echo=TRUE} 
+
+# install.packages("remotes")
+#remotes::install_github("Between-the-Fjords/dataDownloader")
+library("dataDownloader")
 
 # Download data from OSF
-get_file(node = "npfa9", 
-         file = "GriddedDailyClimateData2009-2019.csv", 
-         path = "data_cleaned")
+node <- "npfa9"
+get_file(node = node,
+         file = "GriddedDailyClimateData2009-2019.csv",
+         path = "climate/data/",
+         remote_path = "8_Environmental_data")
+
+```
+
+The data can be read in using the following code.
+The data are provided in a tidy format, containing date, siteID (corresponding with the rest of the SeedClim data), variable (climate variable) and value.
+
+```{r data-import, eval=TRUE, echo=TRUE}
 
 # read in data to R
-climate <- read_csv(file = "data_cleaned/GriddedDailyClimateData2009-2019.csv", col_names = TRUE)
+climate <- read_csv(file = "climate/data/GriddedDailyClimateData2009-2019.csv")
+climate
 
 ```
 
 
 ## Calculate monthly and annual values
 
-Code to calculate monthly and annual climate data.
+To calculate monthly and annual climate data this code can be used.
 
-```{r}
-# Calculate Monthly Mean
-monthlyClimate <- climate %>%
-  select(-Year, -Month, -Day) %>% 
-  gather(key = Logger, value = value, -Site, -Date) %>% 
-  mutate(dateMonth = dmy(paste0("15-",format(Date, "%b.%Y")))) %>%
-  group_by(dateMonth, Logger, Site) %>%
-  summarise(n = n(), value = mean(value), sum = sum(value)) %>% 
-  mutate(value = ifelse(Logger == "Precipitation", sum, value)) %>% 
+```{r calculations, eval=TRUE, echo=TRUE}
+# Calculate monthly climate data
+monthly_climate <- climate %>%
+  mutate(date_month = dmy(paste0("15-",format(date, "%b.%Y")))) %>%
+  group_by(date_month, variable, siteID) %>%
+  summarise(n = n(), 
+            value = mean(value), 
+            sum = sum(value)) %>% 
+  mutate(value = ifelse(variable == "precipitation", sum, value)) %>% 
   select(-n, -sum)
 
 
-# Calculate Annual Means
-annualClimate <- monthlyClimate %>% 
-  mutate(dateYear = year(dateMonth)) %>%
-  group_by(dateYear, Logger, Site) %>%
-  summarise(annualMean = mean(value)) %>% 
-  spread(key = Logger, value = annualMean)
+# Calculate annual climate data
+annual_climate <- monthly_climate %>% 
+  mutate(year = year(date_month)) %>%
+  group_by(year, variable, siteID) %>%
+  summarise(annual_value = mean(value))
 
 ```
 
 
 ## Plotting the data
 
-Temperature
+### Temperature
 
-```{r}
-p <- ggplot(climate, aes(x = Date, y = Temperature, color = Site)) +
+```{r temp, eval=TRUE, echo=TRUE}
+p <- climate %>% 
+  pivot_wider(names_from = "variable", values_from = "value") %>% 
+  mutate(siteID = factor(siteID, levels = c("Ulvehaugen", "Lavisdalen", "Gudmedalen", "Skjelingahaugen", "Alrust", "Hogsete", "Rambera", "Veskre", "Fauske", "Vikesland", "Arhelleren", "Ovstedalen", "Joasete", "Liahovden"))) %>%
+  ggplot(aes(x = date, y = temperature, color = siteID)) +
   geom_line() +
   scale_colour_brewer(palette="Paired") +
-  facet_wrap(~ Site) + 
-  theme(legend.position="none") +
-  ggtitle("Temperature")
+  facet_wrap(~ siteID) + 
+  theme(legend.position = "none") +
+  ggtitle("Mean daily temperature °C")
 p
 ```
 
 
 RelAirMoisture
 
-```{r}
-p + aes(y = RelAirMoisture) +
-  ggtitle("Relative Air Moisture")
+```{r moist, eval=TRUE, echo=TRUE}
+p + aes(y = rel_air_moisture) +
+  ggtitle("Relative air moisture %")
 ```
 
 
 Wind
-```{r}
-p + aes(y = Wind) +
-  ggtitle("Wind")
+```{r wind, eval=TRUE, echo=TRUE}
+p + aes(y = wind) +
+  ggtitle("Wind meter per second")
 
 ```
 
 
 CloudCover
-```{r}
-p + aes(y = CloudCover) +
-  ggtitle("Cloud Cover")
+```{r cloud, eval=TRUE, echo=TRUE}
+p + aes(y = cloud_cover) +
+  ggtitle("Cloud cover")
 ```
 
 
 Precipitation
-```{r}
-p + aes(y = Precipitation) +
-  ggtitle("Precipitation")
+```{r prec, eval=TRUE, echo=TRUE}
+p + aes(y = precipitation) +
+  ggtitle("precipitation mm")
 
 ```
 
