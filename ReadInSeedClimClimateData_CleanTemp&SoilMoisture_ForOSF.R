@@ -2,7 +2,7 @@
  # READ IN AND CLEAN RAW SEEDCLIM CLIMATE DATA FROM OSF #
 #########################################################
 
-### LIBRARIES
+### LIBRARIES 
 library("lubridate")
 library("tidyverse")
 library("data.table")
@@ -69,7 +69,26 @@ temperature <- subset(climate, logger %in% c("temp1", "temp2", "temp200cm", "tem
 precipitation <- subset(climate, logger %in% c("nedbor", "rain", "arg100", "counter", "counter1", "counter2"))
 soilmoisture <- subset(climate, logger %in% c("jordf1", "jordf2", "soil.moisture", "soil moisture 2", "soil moisture 1", "soil moisture", "sm300 2", "sm300 1", "jordfukt2"))
 
-save(precipitation, file = "Precipitation.RData")
+
+## do some work to fix the precipitation data
+precipitation <- precipitation %>%
+  mutate(logger = recode(logger, "arg100" = "precipitation", "nedbor" = "precipitation",
+                         "rain" = "precipitation", "counter" = "counter", "counter1" = "counter",
+                         "counter2" = "counter")) %>%
+  pivot_wider(names_from = logger, values_from = value, values_fn = {mean} )%>% # messed up values for counter-0s
+  mutate(site = recode(site, "skj" = "Skjellingahaugen", "gud" = "Gudmedalen", 
+                     "lav" = "Lavisdalen", "ulv" = "Ulvhaugen", "ves" = "Veskre", 
+                     "ram" = "Rambera", "hog" = "Hogsete", "alr" = "Alrust", "ovs" = "Ovstedalen",
+                     "arh" = "Arhelleren", "vik" = "Vikesland", "fau" = "Fauske"),
+       site = factor(site, levels = c("Skjellingahaugen", "Gudmedalen", "Lavisdalen", "Ulvhaugen",
+                                      "Veskre", "Rambera", "Hogsete", "Alrust", "Ovstedalen", "Arhelleren",
+                                      "Vikesland", "Fauske"))) %>%
+  rename(siteID = site) %>%
+  select(date, siteID, precipitation, counter)
+
+
+write_csv(precipitation, "Precipitation.csv")
+
 save(soilmoisture, file = "Soilmoisture.RData")
 
 # if(basename(textfile) %in% c("Fauske_temp_Fall2016.txt")){
@@ -413,17 +432,19 @@ temperature2 <- temperature2 %>%
                        "lav" = "Lavisdalen", "ulv" = "Ulvhaugen", "ves" = "Veskre", 
                        "ram" = "Rambera", "hog" = "Hogsete", "alr" = "Alrust", "ovs" = "Ovstedalen",
                        "arh" = "Arhelleren", "vik" = "Vikesland", "fau" = "Fauske"),
-         site = factor(site, levels = c("Skjellingahaugen", "Gudmedalen", "Lavisdalen", "Ulvhaugen", "Veskre", "Rambera", "Hogsete", "Alrust", "Ovstedalen", "Arhelleren", "Vikesland", "Fauske")))
-
+         site = factor(site, levels = c("Skjellingahaugen", "Gudmedalen", "Lavisdalen", "Ulvhaugen", "Veskre", "Rambera", "Hogsete", "Alrust", "Ovstedalen", "Arhelleren", "Vikesland", "Fauske"))) %>%
+  rename(siteID = site) %>% select(date, siteID, logger, value, flag)
+  
 # fill missing dates with NA and merging with complete dataset
-full_grid <- expand.grid(logger = unique(temperature2$logger), site = unique(temperature2$site), date = seq(min(temperature2$date), max(temperature2$date), by = "hour"))
+full_grid <- expand.grid(logger = unique(temperature2$logger), siteID = unique(temperature2$siteID), date = seq(min(temperature2$date), max(temperature2$date), by = "hour")) 
 
 temperature2 <- left_join(full_grid, temperature2) %>% as_tibble()
 
-temperature2 <- temperature2 %>% filter(date < "2021-01-01 00:00:00")# remove the 2038 data point 
+temperature2 <- temperature2 %>% filter(date < "2021-01-01 00:00:00") %>%# remove the 2038 data point 
+  select(date, siteID, logger, value, flag)
 
 
-save(temperature2, file = "Temperature.RData")
+write_csv(temperature2,"Temperature.csv")
 
 
 # plot single site to check
@@ -601,9 +622,11 @@ soilmoisture3 <-  soilmoisture3 %>% mutate(site = recode(site, "skj" = "Skjellin
                      "lav" = "Lavisdalen", "ulv" = "Ulvhaugen", "ves" = "Veskre", 
                      "ram" = "Rambera", "hog" = "Hogsete", "alr" = "Alrust", "ovs" = "Ovstedalen",
                      "arh" = "Arhelleren", "vik" = "Vikesland", "fau" = "Fauske"),
-       site = factor(site, levels = c("Skjellingahaugen", "Gudmedalen", "Lavisdalen", "Ulvhaugen", "Veskre", "Rambera", 
-                                      "Hogsete", "Alrust", "Ovstedalen", "Arhelleren", "Vikesland", "Fauske")))
+       site = factor(site, levels = c("Skjellingahaugen", "Gudmedalen", "Lavisdalen", "Ulvhaugen", "Veskre",
+                                      "Rambera", 
+                                      "Hogsete", "Alrust", "Ovstedalen", "Arhelleren", "Vikesland", "Fauske"))) %>%
+  rename(siteID = site) %>% select(date, siteID, logger, value, sensor.disagree, flag)
 
 
-save(soilmoisture3, file = "SoilMoisture.RData")
+write_csv(soilmoisture3, "SoilMoisture.csv")
 
