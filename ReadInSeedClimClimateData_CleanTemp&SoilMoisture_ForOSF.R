@@ -76,11 +76,11 @@ precipitation <- precipitation %>%
                          "rain" = "precipitation", "counter" = "counter", "counter1" = "counter",
                          "counter2" = "counter")) %>%
   pivot_wider(names_from = logger, values_from = value, values_fn = {mean} )%>% # messed up values for counter-0s
-  mutate(site = recode(site, "skj" = "Skjellingahaugen", "gud" = "Gudmedalen", 
-                     "lav" = "Lavisdalen", "ulv" = "Ulvhaugen", "ves" = "Veskre", 
+  mutate(site = recode(site, "skj" = "Skjelingahaugen", "gud" = "Gudmedalen", 
+                     "lav" = "Lavisdalen", "ulv" = "Ulvehaugen", "ves" = "Veskre", 
                      "ram" = "Rambera", "hog" = "Hogsete", "alr" = "Alrust", "ovs" = "Ovstedalen",
                      "arh" = "Arhelleren", "vik" = "Vikesland", "fau" = "Fauske"),
-       site = factor(site, levels = c("Skjellingahaugen", "Gudmedalen", "Lavisdalen", "Ulvhaugen",
+       site = factor(site, levels = c("Skjelingahaugen", "Gudmedalen", "Lavisdalen", "Ulvehaugen",
                                       "Veskre", "Rambera", "Hogsete", "Alrust", "Ovstedalen", "Arhelleren",
                                       "Vikesland", "Fauske"))) %>%
   rename(siteID = site) %>%
@@ -428,11 +428,11 @@ temperature2 <- temperature2 %>%
   
   # Rename and order sites levels
   ungroup() %>% 
-  mutate(site = recode(site, "skj" = "Skjellingahaugen", "gud" = "Gudmedalen", 
-                       "lav" = "Lavisdalen", "ulv" = "Ulvhaugen", "ves" = "Veskre", 
+  mutate(site = recode(site, "skj" = "Skjelingahaugen", "gud" = "Gudmedalen", 
+                       "lav" = "Lavisdalen", "ulv" = "Ulvehaugen", "ves" = "Veskre", 
                        "ram" = "Rambera", "hog" = "Hogsete", "alr" = "Alrust", "ovs" = "Ovstedalen",
                        "arh" = "Arhelleren", "vik" = "Vikesland", "fau" = "Fauske"),
-         site = factor(site, levels = c("Skjellingahaugen", "Gudmedalen", "Lavisdalen", "Ulvhaugen", "Veskre", "Rambera", "Hogsete", "Alrust", "Ovstedalen", "Arhelleren", "Vikesland", "Fauske"))) %>%
+         site = factor(site, levels = c("Skjelingahaugen", "Gudmedalen", "Lavisdalen", "Ulvehaugen", "Veskre", "Rambera", "Hogsete", "Alrust", "Ovstedalen", "Arhelleren", "Vikesland", "Fauske"))) %>%
   rename(siteID = site) %>% select(date, siteID, logger, value, flag)
   
 # fill missing dates with NA and merging with complete dataset
@@ -618,13 +618,13 @@ soilmoisture3 <- soilmoisture2 %>% gather("soil.moisture1", "soil.moisture2", ke
 
 
 # finally reassign site names and save
-soilmoisture3 <-  soilmoisture3 %>% mutate(site = recode(site, "skj" = "Skjellingahaugen", "gud" = "Gudmedalen", 
-                     "lav" = "Lavisdalen", "ulv" = "Ulvhaugen", "ves" = "Veskre", 
+soilmoisture3 <-  soilmoisture3 %>% mutate(site = recode(site, "skj" = "Skjelingahaugen", "gud" = "Gudmedalen", 
+                     "lav" = "Lavisdalen", "ulv" = "Ulvehaugen", "ves" = "Veskre", 
                      "ram" = "Rambera", "hog" = "Hogsete", "alr" = "Alrust", "ovs" = "Ovstedalen",
                      "arh" = "Arhelleren", "vik" = "Vikesland", "fau" = "Fauske"),
-       site = factor(site, levels = c("Skjellingahaugen", "Gudmedalen", "Lavisdalen", "Ulvhaugen", "Veskre",
-                                      "Rambera", 
-                                      "Hogsete", "Alrust", "Ovstedalen", "Arhelleren", "Vikesland", "Fauske"))) %>%
+       site = factor(site, levels = c("Skjelingahaugen", "Gudmedalen", "Lavisdalen", "Ulvehaugen", "Veskre",
+                                      "Rambera",  "Hogsete", "Alrust", "Ovstedalen", "Arhelleren", 
+                                      "Vikesland", "Fauske"))) %>%
   rename(siteID = site) %>% select(date, siteID, logger, value, sensor.disagree, flag)
 
 
