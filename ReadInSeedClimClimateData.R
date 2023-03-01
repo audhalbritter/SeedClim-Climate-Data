@@ -14,8 +14,11 @@ pn <- . %>% print(n = Inf)
 source('Functions_ReadInSeedClimClimateData.R')
 
 # DATA FROM OLD PLACE
-oldClimateRepo <- list.files(path = "/Volumes/felles/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site", 
+#PC code
+oldClimateRepo <- list.files(path = "Q:/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site", 
                              pattern = "txt", recursive = TRUE, full.names = TRUE) %>% 
+  #Mac code
+  #oldClimateRepo <- list.files(path = "/Volumes/felles/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site", pattern = "txt", recursive = TRUE, full.names = TRUE) %>% 
   grep(pattern = "Notes|Notater|UVB", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
   grep(pattern = "ITAS\\d{0,4}\\.txt|ITAS-FALL-2014\\.txt", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
   ### files that need fixing!!!
@@ -25,9 +28,11 @@ oldClimateRepo <- list.files(path = "/Volumes/felles/MATNAT/BIO/Felles/007_Funca
   mutate(Repo = "old_Bio_Felles")
 
 # DATA FROM NEW PLACE
-newClimateRepo <- list.files(path = "/Volumes/felles/MATNAT/BIO/Ecological and Environmental Change/SeedClimClimateData/Climate_data_loggers", 
-#climate2 <- list.files(path = "~/Dropbox/seedclim klimadaten/rawdata by Site", 
-           pattern = "txt", recursive = TRUE, full.names = TRUE) %>% 
+#PC code
+newClimateRepo <- list.files(path = "Q:/Ecological and Environmental Change/SeedClimClimateData/Climate_data_loggers", 
+           pattern = "txt", recursive = TRUE, full.names = TRUE) %>%
+  #Mac code
+  #newClimateRepo <- list.files(path = "Q:/Ecological and Environmental Change/SeedClimClimateData/Climate_data_loggers", pattern = "txt", recursive = TRUE, full.names = TRUE) %>%
   grep(pattern = "Notes|Notater|UVB", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
   grep(pattern = "ITAS\\d{0,4}\\.txt|ITAS-FALL-2014\\.txt", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
   #(function(.).[(1:50)]) %>% # only run subset
@@ -59,8 +64,6 @@ climate <- climate %>%
   group_by(date, logger, site, type) %>% 
   slice(1)
 
-#save(climate, file = "climate.Rdata")
-#load(file = "climate.Rdata")  
 
 
 #### CLEAN DATA ####
@@ -68,6 +71,9 @@ climate <- climate %>%
 # remove everything before 1.10.2008, values too high (for temp but then other climate data probably also crap)
 climate <- climate %>% 
   filter(!date < "2008-10-01 00:00:00")
+
+#save(climate, file = "climate.Rdata")
+#load(file = "climate.Rdata")
 
 
 # Check logger names
@@ -79,12 +85,14 @@ climate %>% filter(logger == "x3") %>% ungroup() %>% distinct(file, Repo)
 climate %>% filter(is.na(logger))
 
 # Subset soilmoisture, precipitation and temperatur loggers into seperate object
-temperature <- subset(climate, logger %in% c("temp1", "temp2", "temp200cm", "temp30cm", "", "PØN", "-5cm", "thermistor 1", "thermistor 2", "jord-5cm", "2m", "temperature", "temperature2", "soil temp", "veg. temp", "veg temp"))
-precipitation <- subset(climate, logger %in% c("nedbor", "rain", "arg100", "counter", "counter1", "counter2"))
-soilmoisture <- subset(climate, logger %in% c("jordf1", "jordf2", "soil.moisture", "soil moisture 2", "soil moisture 1", "soil moisture", "sm300 2", "sm300 1", "jordfukt2"))
+#Strange logger names(?): power, resistance1, resistance2, voltage2, voltage1, ...2, 
+temperature <- subset(climate, logger %in% c("temp1", "temp2", "temp200cm", "temp30cm", "", "PØN", "-5cm", "thermistor 1", "thermistor 2", "jord-5cm", "2m", "temperature", "temperature2", "soil temp", "veg. temp", "veg temp", "soil temp.", "veg. temp.", "soil temperature", "soiltemp", "vegtemp"))
+precipitation <- subset(climate, logger %in% c("nedbor", "rain", "arg100", "counter", "counter1", "counter2", "rain2", "precipitation"))
+soilmoisture <- subset(climate, logger %in% c("jordf1", "jordf2", "soil.moisture", "soil moisture 2", "soil moisture 1", "soil moisture", "sm300 2", "sm300 1", "jordfukt2", "jordfukt1", "theta", "soil moist 2", "soil moist 1", "theta2", "soil moist2", "jord1", "jord 2", "jordfukt 1"))
 
 save(precipitation, file = "Precipitation.RData")
 save(soilmoisture, file = "Soilmoisture.RData")
+save(temperature, file = "Temperature_raw.RData")
 
 # if(basename(textfile) %in% c("Fauske_temp_Fall2016.txt")){
 #   message("removing soil moisture and precipitation data from fauske fall 2016 file")
@@ -103,7 +111,7 @@ table(temperature$site, year(temperature$date))
 
 # plot single site
 temperature %>% 
-  filter(site == "skj") %>% 
+  filter(site == "arh") %>% 
   ggplot(aes(x = date, y = value)) +
   geom_line() +
   facet_wrap(~ logger)
@@ -122,6 +130,7 @@ temperature %>%
 
 
 #### DATA CLEANING ####
+load(file = "Temperature_raw.RData", verbose = TRUE)
 
 # Change logger names
 temperature <- temperature %>% 
@@ -407,7 +416,10 @@ temperature2 <- temperature2 %>%
   # remove NAs
   filter(!is.na(value)) %>% 
   # rename loggers
-  mutate(logger = recode(logger, "temp1" = "tempabove", "temp2" = "tempsoil")) %>% 
+  #mutate(logger = recode(logger, "temp1" = "tempabove", "temp2" = "tempsoil")) %>% 
+  mutate(logger = case_when(logger %in% c("temp1", "veg. temp") ~ "veg_temp",
+                                          logger %in% c("temp2", "soil temp") ~ "soil_temp",
+                            TRUE ~ logger)) |> 
   # Remove first observations for 2m
   group_by(site) %>% 
   slice(-c(1:30)) %>% 
@@ -423,14 +435,16 @@ temperature2 <- temperature2 %>%
 # fill missing dates with NA and merging with complete dataset
 full_grid <- expand.grid(logger = unique(temperature2$logger), site = unique(temperature2$site), date = seq(min(temperature2$date), max(temperature2$date), by = "hour"))
 
-temperature2 <- left_join(full_grid, temperature2) %>% tbl_df()
+temperature2 <- left_join(full_grid, temperature2) %>% as_tibble()
 
-save(temperature2, file = "Temperature.RData")
+save(temperature2, file = "Temperature_clean.RData")
+write_csv(temperature2, file = "VCG_clean_temperature_2009-2022.csv")
 
+temperature2 |> distinct(logger)
 
 # plot single site
 temperature2 %>% 
-  filter(site == "Skjellingahaugen") %>% 
+  filter(site == "Arhelleren") %>% 
   ggplot(aes(x = date, y = value)) +
   geom_line() +
   facet_wrap(~ logger)
