@@ -84,7 +84,7 @@ table(climate$logger, climate$site)
 climate %>% filter(logger == "x3") %>% ungroup() %>% distinct(file, Repo)
 climate %>% filter(is.na(logger))
 
-# Subset soilmoisture, precipitation and temperatur loggers into seperate object
+# Subset soil moisture, precipitation and temperature loggers into separate object
 #Strange logger names(?): power, resistance1, resistance2, voltage2, voltage1, ...2, 
 temperature <- subset(climate, logger %in% c("temp1", "temp2", "temp200cm", "temp30cm", "", "PØN", "-5cm", "thermistor 1", "thermistor 2", "jord-5cm", "2m", "temperature", "temperature2", "soil temp", "veg. temp", "veg temp", "soil temp.", "veg. temp.", "soil temperature", "soiltemp", "vegtemp"))
 precipitation <- subset(climate, logger %in% c("nedbor", "rain", "arg100", "counter", "counter1", "counter2", "rain2", "precipitation"))
@@ -101,7 +101,7 @@ save(temperature, file = "Temperature_raw.RData")
 # }
 
 
-# Explore temparure data and plot
+# Explore temperature data and plot
 table(temperature$logger, temperature$site)
 table(temperature$logger, year(temperature$date))
 table(temperature$site, year(temperature$date))
@@ -111,7 +111,8 @@ table(temperature$site, year(temperature$date))
 
 # plot single site
 temperature %>% 
-  filter(site == "arh") %>% 
+  filter(site == "alr") %>% 
+  #filter(logger == "temperature") |> View()
   ggplot(aes(x = date, y = value)) +
   geom_line() +
   facet_wrap(~ logger)
@@ -144,7 +145,7 @@ temperature <- temperature %>%
 #temperature <- temperature[!(temperature$site == "Gud" & temperature$logger == "-5cm"),]
   mutate(logger = ifelse(file %in% c("1229_30092009.txt", "#002474_20180607_1000.txt", "#001066_20081030_0000.txt", "1233_30092009.txt"), "temp30cm", logger)) %>% 
   mutate(logger = ifelse(file %in% c("2488_21092010.txt", "#002482_20180705_0800.txt", "#001047_20081030_0000_Veskre.txt", "1169_30092009.txt"), "temp200cm", logger)) %>% 
-  mutate(logger = recode(logger, "2m" = "temp200cm", "PØN" = "temp200cm", "-5cm" = "temp30cm", "soil temp" = "tempsoil", "veg temp" = "tempabove", "veg. temp" = "tempabove"))
+  mutate(logger = recode(logger, "2m" = "temp200cm", "PØN" = "temp200cm", "-5cm" = "temp30cm", "soil temp" = "tempsoil", "veg temp" = "tempabove", "veg. temp" = "tempabove", "veg. temp." = "tempabove"))
 
 temperature$logger[temperature$logger == ""] <- "temp30cm"
 
@@ -290,8 +291,8 @@ temperature2 <- temperature2 %>%
                        "VarianceProblem_TooHigh", flag))
 
 
-# ULVHAUGEN
-# switch temp1 to soil and temp2 to abovegroun
+# ULVEHAUGEN
+# switch temp1 to soil and temp2 to aboveground
 temperature2 <- temperature2 %>% 
   mutate(logger = ifelse(logger == "temp1" & site == "ulv",
                          "tempsoil", logger),
@@ -334,7 +335,9 @@ temperature2 <- temperature2 %>%
                           logger %in% c("temp1", "temp2", "tempabove", "tempsoil") &
                           year(date) > 2012 &
                           year(date) < 2014,
-                        NA, value))
+                        NA, value)) %>%
+  # remove 2 observations from 2038 (when Linn used her secret time machine) - SB
+  filter(year(date) < 2035)
 
 
 # GUDMEDALEN
@@ -417,8 +420,8 @@ temperature2 <- temperature2 %>%
   filter(!is.na(value)) %>% 
   # rename loggers
   #mutate(logger = recode(logger, "temp1" = "tempabove", "temp2" = "tempsoil")) %>% 
-  mutate(logger = case_when(logger %in% c("temp1", "veg. temp") ~ "veg_temp",
-                                          logger %in% c("temp2", "soil temp") ~ "soil_temp",
+  mutate(logger = case_when(logger %in% c("temp1", "veg. temp", "tempabove") ~ "veg_temp",
+                                          logger %in% c("temp2", "soil temp", "tempsoil", "soil temperature", "soil temp.") ~ "soil_temp",
                             TRUE ~ logger)) |> 
   # Remove first observations for 2m
   group_by(site) %>% 
@@ -427,10 +430,10 @@ temperature2 <- temperature2 %>%
   # Rename and order sites levels
   ungroup() %>% 
   mutate(site = recode(site, "skj" = "Skjellingahaugen", "gud" = "Gudmedalen", 
-                       "lav" = "Lavisdalen", "ulv" = "Ulvhaugen", "ves" = "Veskre", 
+                       "lav" = "Lavisdalen", "ulv" = "Ulvehaugen", "ves" = "Veskre", 
                        "ram" = "Rambera", "hog" = "Hogsete", "alr" = "Alrust", "ovs" = "Ovstedal",
                        "arh" = "Arhelleren", "vik" = "Vikesland", "fau" = "Fauske"),
-         site = factor(site, levels = c("Skjellingahaugen", "Gudmedalen", "Lavisdalen", "Ulvhaugen", "Veskre", "Rambera", "Hogsete", "Alrust", "Ovstedal", "Arhelleren", "Vikesland", "Fauske")))
+         site = factor(site, levels = c("Skjellingahaugen", "Gudmedalen", "Lavisdalen", "Ulvehaugen", "Veskre", "Rambera", "Hogsete", "Alrust", "Ovstedal", "Arhelleren", "Vikesland", "Fauske")))
 
 # fill missing dates with NA and merging with complete dataset
 full_grid <- expand.grid(logger = unique(temperature2$logger), site = unique(temperature2$site), date = seq(min(temperature2$date), max(temperature2$date), by = "hour"))
@@ -444,11 +447,18 @@ temperature2 |> distinct(logger)
 
 # plot single site
 temperature2 %>% 
-  filter(site == "Arhelleren") %>% 
+  filter(site == "Lavisdalen") %>% 
   ggplot(aes(x = date, y = value)) +
   geom_line() +
   facet_wrap(~ logger)
 
+temperature2 |> 
+  filter(site == "Skjellingahaugen",
+         date > "2015-03-06 23:00:00", date < "2019-09-29 23:00:00") %>% 
+  ggplot(aes(x = date, y = value)) +
+  geom_line() +
+  facet_wrap(~ logger)
+  
 
 # Find file names
 temperature %>%
