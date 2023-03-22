@@ -510,7 +510,6 @@ save(temperature2, file = "Temperature_clean.RData")
 write_csv(temperature2, file = "VCG_clean_temperature_2009-2022.csv")
 
 
-
   
 # Plot single site
 temperature2 %>% 
