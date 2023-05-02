@@ -47,7 +47,7 @@ ReadData <- function(textfile){
 }
 
 
-textfile <- "/Volumes/felles/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site//Skj/ITAS/Skjeldingahaugen_ITAS_111015_120705.txt"
+textfile <- "Q:/Ecological and Environmental Change/SeedClimClimateData/Climate_data_loggers/SeedClim 2010/ITAS/LÃ…Vcomplete.txt"
 
 #  READ IN ITAS LOGGERS
 ReadInBodyITAS <- function(textfile){

@@ -14,8 +14,11 @@ pn <- . %>% print(n = Inf)
 source('Functions_ReadInSeedClimClimateData.R')
 
 # DATA FROM OLD PLACE
-oldClimateRepo <- list.files(path = "/Volumes/felles/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site", 
+#PC code
+oldClimateRepo <- list.files(path = "Q:/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site", 
                              pattern = "txt", recursive = TRUE, full.names = TRUE) %>% 
+  #Mac code
+  #oldClimateRepo <- list.files(path = "/Volumes/felles/MATNAT/BIO/Felles/007_Funcab_Seedclim/SeedClimClimateData/rawdata by Site", pattern = "txt", recursive = TRUE, full.names = TRUE) %>% 
   grep(pattern = "Notes|Notater|UVB", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
   grep(pattern = "ITAS\\d{0,4}\\.txt|ITAS-FALL-2014\\.txt", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
   ### files that need fixing!!!
@@ -25,9 +28,11 @@ oldClimateRepo <- list.files(path = "/Volumes/felles/MATNAT/BIO/Felles/007_Funca
   mutate(Repo = "old_Bio_Felles")
 
 # DATA FROM NEW PLACE
-newClimateRepo <- list.files(path = "/Volumes/felles/MATNAT/BIO/Ecological and Environmental Change/SeedClimClimateData/Climate_data_loggers", 
-#climate2 <- list.files(path = "~/Dropbox/seedclim klimadaten/rawdata by Site", 
-           pattern = "txt", recursive = TRUE, full.names = TRUE) %>% 
+#PC code
+newClimateRepo <- list.files(path = "Q:/Ecological and Environmental Change/SeedClimClimateData/Climate_data_loggers", 
+           pattern = "txt", recursive = TRUE, full.names = TRUE) %>%
+  #Mac code
+  #newClimateRepo <- list.files(path = "Q:/Ecological and Environmental Change/SeedClimClimateData/Climate_data_loggers", pattern = "txt", recursive = TRUE, full.names = TRUE) %>%
   grep(pattern = "Notes|Notater|UVB", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
   grep(pattern = "ITAS\\d{0,4}\\.txt|ITAS-FALL-2014\\.txt", x = ., invert = TRUE, value = TRUE, ignore.case = TRUE) %>%
   #(function(.).[(1:50)]) %>% # only run subset
@@ -59,8 +64,6 @@ climate <- climate %>%
   group_by(date, logger, site, type) %>% 
   slice(1)
 
-#save(climate, file = "climate.Rdata")
-#load(file = "climate.Rdata")  
 
 
 #### CLEAN DATA ####
@@ -68,6 +71,9 @@ climate <- climate %>%
 # remove everything before 1.10.2008, values too high (for temp but then other climate data probably also crap)
 climate <- climate %>% 
   filter(!date < "2008-10-01 00:00:00")
+
+#save(climate, file = "climate.Rdata")
+#load(file = "climate.Rdata")
 
 
 # Check logger names
@@ -78,13 +84,15 @@ table(climate$logger, climate$site)
 climate %>% filter(logger == "x3") %>% ungroup() %>% distinct(file, Repo)
 climate %>% filter(is.na(logger))
 
-# Subset soilmoisture, precipitation and temperatur loggers into seperate object
-temperature <- subset(climate, logger %in% c("temp1", "temp2", "temp200cm", "temp30cm", "", "PØN", "-5cm", "thermistor 1", "thermistor 2", "jord-5cm", "2m", "temperature", "temperature2", "soil temp", "veg. temp", "veg temp"))
-precipitation <- subset(climate, logger %in% c("nedbor", "rain", "arg100", "counter", "counter1", "counter2"))
-soilmoisture <- subset(climate, logger %in% c("jordf1", "jordf2", "soil.moisture", "soil moisture 2", "soil moisture 1", "soil moisture", "sm300 2", "sm300 1", "jordfukt2"))
+# Subset soil moisture, precipitation and temperature loggers into separate object
+#Strange logger names(?): power, resistance1, resistance2, voltage2, voltage1, ...2, 
+temperature <- subset(climate, logger %in% c("temp1", "temp2", "temp200cm", "temp30cm", "", "PØN", "-5cm", "thermistor 1", "thermistor 2", "jord-5cm", "2m", "temperature", "temperature2", "soil temp", "veg. temp", "veg temp", "soil temp.", "veg. temp.", "soil temperature", "soiltemp", "vegtemp"))
+precipitation <- subset(climate, logger %in% c("nedbor", "rain", "arg100", "counter", "counter1", "counter2", "rain2", "precipitation"))
+soilmoisture <- subset(climate, logger %in% c("jordf1", "jordf2", "soil.moisture", "soil moisture 2", "soil moisture 1", "soil moisture", "sm300 2", "sm300 1", "jordfukt2", "jordfukt1", "theta", "soil moist 2", "soil moist 1", "theta2", "soil moist2", "jord1", "jord 2", "jordfukt 1"))
 
 save(precipitation, file = "Precipitation.RData")
 save(soilmoisture, file = "Soilmoisture.RData")
+save(temperature, file = "Temperature_raw.RData")
 
 # if(basename(textfile) %in% c("Fauske_temp_Fall2016.txt")){
 #   message("removing soil moisture and precipitation data from fauske fall 2016 file")
@@ -93,7 +101,7 @@ save(soilmoisture, file = "Soilmoisture.RData")
 # }
 
 
-# Explore temparure data and plot
+# Explore temperature data and plot
 table(temperature$logger, temperature$site)
 table(temperature$logger, year(temperature$date))
 table(temperature$site, year(temperature$date))
@@ -103,7 +111,7 @@ table(temperature$site, year(temperature$date))
 
 # plot single site
 temperature %>% 
-  filter(site == "skj") %>% 
+  filter(site == "ulv") %>%
   ggplot(aes(x = date, y = value)) +
   geom_line() +
   facet_wrap(~ logger)
@@ -122,6 +130,7 @@ temperature %>%
 
 
 #### DATA CLEANING ####
+load(file = "Temperature_raw.RData", verbose = TRUE)
 
 # Change logger names
 temperature <- temperature %>% 
@@ -135,7 +144,8 @@ temperature <- temperature %>%
 #temperature <- temperature[!(temperature$site == "Gud" & temperature$logger == "-5cm"),]
   mutate(logger = ifelse(file %in% c("1229_30092009.txt", "#002474_20180607_1000.txt", "#001066_20081030_0000.txt", "1233_30092009.txt"), "temp30cm", logger)) %>% 
   mutate(logger = ifelse(file %in% c("2488_21092010.txt", "#002482_20180705_0800.txt", "#001047_20081030_0000_Veskre.txt", "1169_30092009.txt"), "temp200cm", logger)) %>% 
-  mutate(logger = recode(logger, "2m" = "temp200cm", "PØN" = "temp200cm", "-5cm" = "temp30cm", "soil temp" = "tempsoil", "veg temp" = "tempabove", "veg. temp" = "tempabove"))
+  mutate(logger = recode(logger, "2m" = "temp200cm", "PØN" = "temp200cm", "-5cm" = "temp30cm", "soil temp" = "tempsoil", "veg temp" = "tempabove", "veg. temp" = "tempabove", "veg. temp." = "tempabove", "vegtemp" = "tempabove", "soil temperature" = "tempsoil", "soil temp." = "tempsoil", "soiltemp" = "tempsoil"))
+
 
 temperature$logger[temperature$logger == ""] <- "temp30cm"
 
@@ -178,7 +188,15 @@ temperature2 <- temperature2 %>%
                                    "Vikesland_climate_Fall2016.txt", "Vikesland_climate.txt",
                                    "Vikesland_climate_autumn2017.txt") &
                          logger == "temp2",
-                       "VarianceProblem_TooHigh", flag))
+                       "VarianceProblem_TooHigh", flag)) %>%
+  # Removing low values from logger temp2 (soil) from Oct, Nov and Dec 2018
+  mutate(value = if_else(site == "vik" &
+                           date > dmy_hms("01.10.2018 00:00:00") &
+                           date < dmy_hms("01.01.2019 00:00:00") &
+                           value < -2 &
+                           logger == "temp2",
+                         NA_real_, value))
+
 
 
 # ARHELLEREN
@@ -186,7 +204,7 @@ temperature2 <- temperature2 %>%
 temperature2 <- temperature2 %>% 
   mutate(logger = ifelse(file == "Arhelleren_08072009.txt" & logger == "temp1", "tempsoil", logger),
          logger = ifelse(file == "Arhelleren_08072009.txt" & logger == "temp2", "tempabove", logger))%>%
- ## flag high variacne in the the post 2018 summer temps above-sun exposure as above-JSL
+ ## flag high variance in the the post 2018 summer temps above-sun exposure as above-JSL
    mutate(flag = ifelse(site == "arh" &
                            year(date) >= 2018 &
                            logger == "tempabove",
@@ -208,7 +226,6 @@ temperature2 <- temperature2 %>%
 
 
 
-
 # VESKRE
 temperature2 <- temperature2 %>% 
   # switch temp1 and temp2 from 2014, 2016, 2017
@@ -222,11 +239,23 @@ temperature2 <- temperature2 %>%
                          file %in% c("Veskre_climate 20150909 - 20151011.txt", "Veskre_climate.txt"),
                        "VarianceProblem_TooLow", flag)) %>%
   # temperature data at veskre belongs in tempsoil-JSL
-  mutate(logger = ifelse(file %in% c("Veskre_klima.txt") &
-                           logger== "temperature", "tempsoil", logger))
+  mutate(logger = ifelse(file %in% c("Veskre_klima.txt") & 
+                           logger== "temperature", "tempsoil", logger)) %>%
+  # Removing data from logger "temperature" from 2021 
+  mutate(value = if_else(site == "ves" &
+                           year(date) == 2021 &
+                           logger == "temperature",
+                         NA_real_, value)) %>%
+  # Removing very low values from tempabove from Oct 2021
+  mutate(value = if_else(site == "ves" &
+                         year(date) == 2021 &
+                         month(date) == 07 &
+                         logger == "tempabove" &
+                         value < -10,
+                         NA_real_, value))
+                           
 
-
-# RAMBAERA
+# RAMBERA
 temperature2 <- temperature2 %>% 
   # switch temp1 and temp2 before 2014
   mutate(logger = ifelse(site == "ram" &
@@ -242,7 +271,20 @@ temperature2 <- temperature2 %>%
                          logger == "temp2" &
                          file == "Rambera_met1.txt" &
                          date < dmy_hms("24.05.2016 18:00:00"),
-                       "VarianceProblem_TooHigh", flag))
+                       "VarianceProblem_TooHigh", flag)) %>%
+  # Flag soil temp from 2020, too large variance
+  mutate(flag = if_else(site == "ram" &
+                         year(date) == 2020 &
+                         month(date) == 06 &
+                         logger %in% c("temp2", "tempsoil"),
+                        "VarianceProblem_TooHigh", flag)) %>% 
+  # Removing high values from temp200cm in 2009
+  mutate(value = if_else(site == "ram" &
+                           year(date) == 2009 &
+                           logger == "temp200cm" &
+                           value > 35,
+                         NA_real_, value))
+
 
 
 # HOGSETE
@@ -278,11 +320,17 @@ temperature2 <- temperature2 %>%
                          logger %in% c("temp2", "tempsoil") &
                          year(date) == 2010 &
                          year(date) == 2015,
-                       "VarianceProblem_TooHigh", flag))
+                       "VarianceProblem_TooHigh", flag)) %>% 
+  # Removing high values from temp30cm in 2009
+  mutate(value = if_else(site == "alr" &
+                           year(date) == 2009 &
+                           logger == "temp200cm" &
+                           value > 30,
+                         NA_real_, value))
 
 
-# ULVHAUGEN
-# switch temp1 to soil and temp2 to abovegroun
+# ULVEHAUGEN
+# switch temp1 to soil and temp2 to aboveground
 temperature2 <- temperature2 %>% 
   mutate(logger = ifelse(logger == "temp1" & site == "ulv",
                          "tempsoil", logger),
@@ -325,7 +373,19 @@ temperature2 <- temperature2 %>%
                           logger %in% c("temp1", "temp2", "tempabove", "tempsoil") &
                           year(date) > 2012 &
                           year(date) < 2014,
-                        NA, value))
+                        NA, value)) %>%
+  # Remove 2 observations from 2038 (when Linn used her secret time machine) - SB
+  filter(year(date) < 2035) %>%
+  # Flag soil temp in 2021 for high variance
+  mutate(flag = if_else(site == "lav" &
+                          year(date) == 2021 &
+                         logger == "tempsoil",
+                       "VarianceProblem_TooHigh", flag)) %>%
+  # Flag veg temp in 2021 for low variance
+  mutate(flag = if_else(site == "lav" &
+                          year(date) == 2021 &
+                          logger %in% c("tempabove"),
+                        "VarianceProblem_TooLow", flag))
 
 
 # GUDMEDALEN
@@ -360,10 +420,19 @@ temperature2 <- temperature2 %>%
   # Variance problems with above logger between end of June 2014 - Oct 2014
   mutate(flag = ifelse(file == "Gudmedalen_ITAS_140619_141013.txt" &
                          logger == "tempabove",
-                       "VarianceProblem_TooLow", flag))
+                       "VarianceProblem_TooLow", flag)) %>%
+  # Assigning new names for temperature and temperature2 in 2020
+  mutate(logger = if_else(site == "gud" &
+                            year(date) == 2020 &
+                            logger == "temperature",
+                          "veg_temp", logger)) %>%
+  mutate(logger = if_else(site == "gud" &
+                            year(date) == 2020 &
+                            logger == "temperature2",
+                          "soil_temp", logger))
 
 
-# SKJELLINGAHAUGEN
+# SKJELINGAHAUGEN
 temperature2 <- temperature2 %>% 
   # Flag variance problems with temp1 logger in 2014
   mutate(flag = ifelse(site == "skj" &
@@ -376,14 +445,14 @@ temperature2 <- temperature2 %>%
                          logger %in% c("temp1","temp2"),
                        "Bias_FewDataPoints", flag)) %>% 
   # switch logger from 2015 - 2016
-  mutate(logger = ifelse(site == "skj" &
-                           logger == "temp1" &
-                           file %in% c("Skjellingahaugen_met1 20141016 - 20150121.txt", "Skjellingahaugen_met1_20150806 - 20150814.txt", "Skjellingahaugen_met1-20150907- 20150910.txt", "Skjellingahaugen_met1_Spring2017.txt", "Skjellingahaugen_met1_temp_prec_20170712-20170808_Spring2017.txt"),
+   mutate(logger = ifelse(site == "skj" &
+                            logger == "temp1" &
+                            file %in% c("Skjellingahaugen_met1 20141016 - 20150121.txt", "Skjellingahaugen_met1_20150806 - 20150814.txt", "Skjellingahaugen_met1-20150907- 20150910.txt", "Skjellingahaugen_met1_Spring2017.txt", "Skjellingahaugen_met1_temp_prec_20170712-20170808_Spring2017.txt"),
                          "tempsoil", logger),
-         logger = ifelse(site == "skj" &
-                           logger == "temp2" &
-                           file %in% c("Skjellingahaugen_met1 20141016 - 20150121.txt", "Skjellingahaugen_met1_20150806 - 20150814.txt", "Skjellingahaugen_met1-20150907- 20150910.txt", "Skjellingahaugen_met1_Spring2017.txt", "Skjellingahaugen_met1_temp_prec_20170712-20170808_Spring2017.txt"),
-                         "tempabove", logger)) %>% 
+          logger = ifelse(site == "skj" &
+                            logger == "temp2" &
+                            file %in% c("Skjellingahaugen_met1 20141016 - 20150121.txt", "Skjellingahaugen_met1_20150806 - 20150814.txt", "Skjellingahaugen_met1-20150907- 20150910.txt", "Skjellingahaugen_met1_Spring2017.txt", "Skjellingahaugen_met1_temp_prec_20170712-20170808_Spring2017.txt"),
+                          "tempabove", logger)) %>%
   # remove high values at the start
   mutate(value = ifelse(site == "skj" &
                           logger %in% c("temp200cm", "temp30cm") &
@@ -393,8 +462,17 @@ temperature2 <- temperature2 %>%
   mutate(value = ifelse(site == "skj" &
                           logger %in% c("temperature", "temperature2") &
                           year(date)==2019,
-                        NA, value))
+                        NA, value)) %>% 
   #filter(!between(date, as.Date("2019-06-18"), as.Date("2019-06-20")))
+  # Switching soil- and vegetation data from 2015, 2016, 2017
+  mutate(logger = if_else(site == "skj" &
+                            year(date) %in% c(2015, 2016, 2017) &
+                            logger == "temp1",
+                         "tempsoil", logger),
+         logger = if_else(site == "skj" &
+                            year(date) %in% c(2015, 2016, 2017) &
+                            logger == "temp2",
+                         "tempabove", logger))
 
 
 
@@ -407,34 +485,46 @@ temperature2 <- temperature2 %>%
   # remove NAs
   filter(!is.na(value)) %>% 
   # rename loggers
-  mutate(logger = recode(logger, "temp1" = "tempabove", "temp2" = "tempsoil")) %>% 
+  mutate(logger = case_when(logger %in% c("temp1", "tempabove") ~ "veg_temp",
+                            logger %in% c("temp2", "tempsoil") ~ "soil_temp",
+                            TRUE ~ logger)) %>%  
   # Remove first observations for 2m
   group_by(site) %>% 
   slice(-c(1:30)) %>% 
   
   # Rename and order sites levels
   ungroup() %>% 
-  mutate(site = recode(site, "skj" = "Skjellingahaugen", "gud" = "Gudmedalen", 
-                       "lav" = "Lavisdalen", "ulv" = "Ulvhaugen", "ves" = "Veskre", 
-                       "ram" = "Rambera", "hog" = "Hogsete", "alr" = "Alrust", "ovs" = "Ovstedal",
+  mutate(site = recode(site, "skj" = "Skjelingahaugen", "gud" = "Gudmedalen", 
+                       "lav" = "Lavisdalen", "ulv" = "Ulvehaugen", "ves" = "Veskre", 
+                       "ram" = "Rambera", "hog" = "Hogsete", "alr" = "Alrust", "ovs" = "Ovstedalen",
                        "arh" = "Arhelleren", "vik" = "Vikesland", "fau" = "Fauske"),
-         site = factor(site, levels = c("Skjellingahaugen", "Gudmedalen", "Lavisdalen", "Ulvhaugen", "Veskre", "Rambera", "Hogsete", "Alrust", "Ovstedal", "Arhelleren", "Vikesland", "Fauske")))
+         site = factor(site, levels = c("Skjelingahaugen", "Gudmedalen", "Lavisdalen", "Ulvehaugen", "Veskre", "Rambera", "Hogsete", "Alrust", "Ovstedalen", "Arhelleren", "Vikesland", "Fauske")))
+
 
 # fill missing dates with NA and merging with complete dataset
 full_grid <- expand.grid(logger = unique(temperature2$logger), site = unique(temperature2$site), date = seq(min(temperature2$date), max(temperature2$date), by = "hour"))
 
-temperature2 <- left_join(full_grid, temperature2) %>% tbl_df()
+temperature2 <- left_join(full_grid, temperature2) %>% as_tibble()
 
-save(temperature2, file = "Temperature.RData")
+save(temperature2, file = "Temperature_clean.RData")
+write_csv(temperature2, file = "VCG_clean_temperature_2009-2022.csv")
 
 
-# plot single site
+  
+# Plot single site
 temperature2 %>% 
-  filter(site == "Skjellingahaugen") %>% 
+  filter(site == "Arhelleren") %>% 
   ggplot(aes(x = date, y = value)) +
   geom_line() +
   facet_wrap(~ logger)
 
+temperature2 %>% 
+  filter(site == "Arhelleren", 
+         date > "2018-01-01 00:00:00", date < "2021-01-01 00:00:00") %>% 
+  ggplot(aes(x = date, y = value)) +
+  geom_line() +
+  facet_wrap(~ logger)
+  
 
 # Find file names
 temperature %>%
