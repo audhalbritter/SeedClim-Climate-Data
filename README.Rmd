@@ -1,0 +1,393 @@
+---
+title: "SeedClim Climate Data — Processing Pipeline"
+output:
+  github_document:
+    toc: true
+    toc_depth: 3
+date: "Last rendered: `r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo      = TRUE,
+  message   = FALSE,
+  warning   = FALSE,
+  fig.path  = "output/figures/README_",
+  fig.width = 12,
+  fig.height = 6,
+  dpi       = 150
+)
+library(data.table)
+library(lubridate)
+library(tidyverse)
+library(patchwork)
+source("R/02_functions.R")
+```
+
+---
+
+## Overview
+
+This repository processes raw temperature logger data from the **SeedClim** project (Norwegian alpine grassland climate experiment). Data spans **2008–2025** across **12 sites** arranged along independent gradients of temperature and precipitation.
+
+Two logger types are used:
+
+| Type | Description | Format |
+|------|-------------|--------|
+| **ITAS** | Station logger measuring air and soil temperature at hourly resolution | Tab-delimited `.txt`, header with `"Label"` |
+| **UTL** | Single-channel temperature logger (30 cm or 200 cm depth) | Tab-delimited `.txt`, variable-length header ending at `"Sample"` |
+
+Each site has one ITAS station (measuring `temp1` = near-surface, `temp2` = soil) and two UTL loggers (30 cm and 200 cm depth).
+
+### The 12 sites
+
+```{r sites-table, echo=FALSE}
+sites <- data.frame(
+  Code = c("fau","alr","ulv","vik","hog","lav","arh","ram","gud","ovs","ves","skj"),
+  Name = c("Fauske","Alrust","Ulvehaugen","Vikesland","Hogsete","Lavisdalen",
+           "Arhelleren","Rambera","Gudmedalen","Ovstedalen","Veskre","Skjelingahaugen"),
+  stringsAsFactors = FALSE
+)
+knitr::kable(sites, col.names = c("Site code", "Full name"))
+```
+
+---
+
+## Data sources
+
+Three data folders exist in this repository:
+
+| Folder | Description | File count | Coverage |
+|--------|-------------|-----------|----------|
+| `data/ClimatDataFromBioFelles/` | Old network drive, organised by site | ~1 285 | 2009–2019 |
+| `data/ClimateDataFromBioEECRG/` | New network drive, organised by year | ~1 769 | 2008–2020 |
+| `data/ITAS_UTL_climate_data_2008-2025/` | **Canonical local copy** | ~2 515 | 2008–2025 |
+
+The pipeline opens with a data audit (Step 1) that compares file basenames across all three folders and flags any files present in the old sources but missing from the canonical source. In practice, `ITAS_UTL_climate_data_2008-2025` is a superset: it contains all files from the two older folders and adds the 2021–2025 data.
+
+**The pipeline reads primarily from `data/ITAS_UTL_climate_data_2008-2025/`.** In Step 1 (audit), any files present in `ClimatDataFromBioFelles` but absent from the canonical folder by basename are automatically imported as a supplement. Content-level deduplication (same date + logger + site + value) in Step 3 removes any genuine duplicates that differ only in filename. The `source_repo` column in the output records which source each row came from.
+
+---
+
+## Pipeline steps
+
+The two new scripts are:
+
+| Script | Role |
+|--------|------|
+| [`R/02_functions.R`](R/02_functions.R) | All helper functions (reading, cleaning, flagging, plotting) |
+| [`R/02_climate_pipeline.R`](R/02_climate_pipeline.R) | Main pipeline — sources functions and runs all steps |
+
+The original scripts (`R/ReadInSeedClimClimateData.R` and `R/Functions_ReadInSeedClimClimateData.R`) are left untouched.
+
+### Step-by-step summary
+
+1. **Data source audit** — compare basenames across all three folders, report missing files
+2. **Import** — read all `.txt` files from canonical source using `ReadData()`, skip excluded files, collect with `rbindlist()`
+3. **Initial cleaning** — remove warm-up rows, pre-2008 data, and duplicates
+4. **Split and save raw** — separate temperature, precipitation, and soil moisture; save precipitation and soil moisture as raw CSV without further processing
+5. **Logger name normalisation** — recode all name variants to a consistent intermediate vocabulary
+6. **Per-site manual overrides** — apply documented knowledge about each site's logger placement; all changes recorded in `logger_swap` column
+7. **Automated variance assignment** — for remaining `temp1`/`temp2` pairs, use variance ratio to assign soil vs. above-ground
+8. **Outlier detection** — flag physically impossible values, impossible rate-of-change, and monthly IQR outliers
+9. **Final rename and merge** — rename to `veg_temp`/`soil_temp`, fill complete hourly grid with `data.table::CJ()`, save all outputs as CSV
+10. **Visualisation** — generate diagnostic plots
+
+---
+
+## Output files
+
+```
+output/
+├── Temperature_clean.csv          — cleaned temperature data
+│                                    columns: date, logger, value, site, type, file, flag, logger_swap
+├── Precipitation_raw.csv          — raw precipitation (unprocessed)
+├── Soilmoisture_raw.csv           — raw soil moisture (unprocessed)
+└── variance_ratio_diagnostics.csv — per-file variance ratios for audit
+```
+
+### Column descriptions for `Temperature_clean.csv`
+
+| Column | Description |
+|--------|-------------|
+| `date` | POSIXct timestamp, UTC+1 (Africa/Algiers tz = UTC+1, no DST) |
+| `logger` | `veg_temp`, `soil_temp`, `temp30cm`, `temp200cm` |
+| `value` | Temperature in °C; `NA` where missing or bad |
+| `site` | Full site name (factor, ordered warm→cold) |
+| `type` | `ITAS` or `UTL` |
+| `file` | Source file basename |
+| `source_repo` | `"canonical"` (from `ITAS_UTL_climate_data_2008-2025`) or `"biofelles_supplement"` (files found in `ClimatDataFromBioFelles` that were absent from the canonical folder by name); `NA` for rows added by the full time-grid join |
+| `flag` | Pipe-separated quality flags (see below); `NA` = clean |
+| `logger_swap` | Documents any logger re-assignment; `NA` = original label kept |
+
+---
+
+## Logger name standardisation
+
+The raw data contains many variants of the same measurement. The table below shows how all logger names are mapped to the final canonical names.
+
+| Raw name(s) | Intermediate | Final |
+|-------------|-------------|-------|
+| `temp1` | `temp1` → site override / variance test | `veg_temp` or `soil_temp` |
+| `temp2` | `temp2` → site override / variance test | `veg_temp` or `soil_temp` |
+| `thermistor 1`, `thermistor 2` | Fauske only — explicit override | `tempabove` / `tempsoil` |
+| `temperature`, `temperature2` | Site-specific override | `tempabove` / `tempsoil` |
+| `soil temp`, `soil temp.`, `soil temperature`, `soiltemp` | `tempsoil` | `soil_temp` |
+| `veg temp`, `veg. temp`, `veg. temp.`, `vegtemp` | `tempabove` | `veg_temp` |
+| `2m`, `PØN` | `temp200cm` | `temp200cm` |
+| `-5cm`, `jord-5cm`, `""` | `temp30cm` | `temp30cm` |
+
+---
+
+## Soil vs. vegetation temperature assignment
+
+The ITAS station records two channels (`temp1` and `temp2`) but the labelling in the logger files is inconsistent across sites and time periods. Determining which channel is soil and which is above-ground requires two steps.
+
+### Step 1: Per-site manual overrides (run first)
+
+For all sites where the assignment is documented from field records, `apply_site_overrides()` renames the loggers directly. Every change is recorded in the `logger_swap` column.
+
+```{r manual-swaps-table, echo=FALSE}
+manual_swaps <- data.frame(
+  Site = c("Fauske","Fauske","Ulvehaugen","Ulvehaugen",
+           "Alrust (pre-2016)","Alrust (pre-2016)",
+           "Rambera (pre-2014)","Rambera (pre-2014)",
+           "Lavisdalen (pre-2012)","Lavisdalen (pre-2012)",
+           "Gudmedalen (pre-2015)","Gudmedalen (pre-2015)",
+           "Skjellingahaugen (2015–2017)","Skjellingahaugen (2015–2017)",
+           "Arhelleren (Jul 2009 file)","Arhelleren (Jul 2009 file)",
+           "Veskre (2014/2016/2017 files)","Veskre (2014/2016/2017 files)"),
+  Raw = c("temp1/thermistor 2","temp2/thermistor 1",
+          "temp1","temp2",
+          "temp1","temp2",
+          "temp1","temp2",
+          "temp1","temp2",
+          "temp1","temp2",
+          "temp1","temp2",
+          "temp1","temp2",
+          "temp1","temp2"),
+  Assigned = c("tempsoil","tempabove",
+               "tempsoil","tempabove",
+               "tempsoil","tempabove",
+               "tempsoil","tempabove",
+               "tempsoil","tempabove",
+               "tempsoil","tempabove",
+               "tempsoil","tempabove",
+               "tempsoil","tempabove",
+               "tempsoil","tempabove"),
+  stringsAsFactors = FALSE
+)
+knitr::kable(manual_swaps, col.names = c("Site / period", "Raw label", "Assigned as"))
+```
+
+After 2016 at Alrust, after 2013 at Rambera, etc., the standard (non-swapped) assignment applies: `temp1` → `veg_temp`, `temp2` → `soil_temp`.
+
+### Step 2: Automated variance-ratio test (for remaining pairs)
+
+For any `temp1`/`temp2` pairs not covered by a manual override (primarily new data from 2021–2025), `assign_soil_veg_loggers()` uses the variance ratio:
+
+$$\text{ratio} = \frac{\text{var(temp1)}}{\text{var(temp2)}}$$
+
+| Ratio | Interpretation | Action |
+|-------|---------------|--------|
+| < 0.80 | temp1 has lower variance → soil | temp1 → `tempsoil`, temp2 → `tempabove` |
+| > 1.25 | temp2 has lower variance → soil | temp2 → `tempsoil`, temp1 → `tempabove` |
+| 0.80–1.25 | Variances too similar to distinguish | Flag as `VarianceProblem_TooSimilar` |
+
+**Why variance?** Soil temperature is buffered by the ground and varies much less than air/near-surface temperature, especially on daily and sub-weekly timescales. This signal is reliable for files with ≥ 48 observations.
+
+The plot below shows the variance ratios for all files that entered the automated test. Points outside the dashed lines were automatically assigned; points between the lines were flagged as ambiguous.
+
+```{r variance-ratio-plot, echo=FALSE, fig.height=8, fig.cap="Variance ratio (var_temp1 / var_temp2) per file. Points outside dashed lines (0.8 and 1.25) are automatically assigned."}
+if (file.exists("output/variance_ratio_diagnostics.csv")) {
+  var_diag <- fread("output/variance_ratio_diagnostics.csv")
+  if (nrow(var_diag) > 0 && "var_ratio" %in% names(var_diag)) {
+    plot_variance_ratios(var_diag)
+  } else {
+    message("No variance ratio data to plot.")
+  }
+} else {
+  message("Run R/02_climate_pipeline.R first to generate variance_ratio_diagnostics.csv")
+}
+```
+
+The `logger_swap` column in the output CSV records exactly what was done:
+- `NA` — original label kept, no change
+- `AutoSwap_VarRatio:0.43 (temp1→soil)` — automated assignment, ratio shown for audit
+- `ManualSwap: Fauske — temp1/thermistor2 always soil` — explicit override, reason documented
+
+---
+
+## Flag vocabulary
+
+Two tracking columns are used throughout the pipeline:
+
+### `flag` — data quality
+
+| Flag | Meaning |
+|------|---------|
+| `VarianceProblem_TooHigh` | Logger likely exposed to sun or not embedded in medium |
+| `VarianceProblem_TooLow` | Both sensors appear to be in the same medium (no contrast) |
+| `VarianceProblem_TooSimilar` | Automated — variance ratio between 0.8 and 1.25 |
+| `Bias_Sensor` | Known systematic offset (e.g., Ovstedal temp2 post-2016) |
+| `Bias_IncreasingVarOverTime` | Known degradation of sensor insulation over time (Lavisdalen above) |
+| `Bias_FewDataPoints` | Too few observations for reliable use (Skjellingahaugen 2012) |
+| `WrongValues_TooLow` | Values clearly too low to be physical (Hogsete 2015–2016) |
+| `Outlier_GlobalRange` | Outside physically plausible temperature range |
+| `Outlier_RateOfChange` | Change > 5 °C between consecutive hourly readings |
+| `Outlier_IQR` | Outside Q1 − 3×IQR … Q3 + 3×IQR for same site × logger × month |
+| `Missing_Gap` | Gap to the next observation exceeds 72 hours |
+
+Multiple flags can apply to the same row; they are separated by `|`.
+
+### `logger_swap` — assignment audit trail
+
+Documents every reassignment of `temp1`/`temp2` labels (see above). This column allows you to:
+- Filter to all automated assignments and check them
+- Identify all rows affected by a particular manual override
+- Reverse a wrong assignment if one is discovered later
+
+---
+
+## Outlier detection
+
+Three methods are applied in `flag_outliers()`:
+
+**1. Global range filter**
+Flags values outside physically plausible limits before any other processing.
+- Above-ground / unassigned: −40 °C to +50 °C
+- Soil loggers: −20 °C to +35 °C
+
+**2. Rate of change**
+Flags consecutive hourly readings that differ by more than 5 °C. This catches spikes from logger resets, logging errors, and brief accidental sensor exposure.
+
+**3. Monthly IQR**
+For each site × logger × calendar month, computes Q1 and Q3 and flags values outside Q1 − 3×IQR … Q3 + 3×IQR. The monthly grouping accounts for the strong seasonal cycle: a value that is an outlier in January (where −20 °C is possible) might not be one in July.
+
+> **Note on Hampel identifier:** A rolling-median-based Hampel identifier (the method described in the plan) is noted as a future improvement. It provides more localised detection but `frollapply(median)` is slow on datasets of this size. The current monthly IQR approach is equivalent in effect for most common failure modes. See the `# TODO` comment in `flag_outliers()` in `R/02_functions.R`.
+
+Flags do **not** automatically set `value` to `NA` — flagged rows are retained in the output. Users can filter on `flag` to choose how to handle flagged data (e.g., exclude all flagged rows, or only exclude specific flag types).
+
+---
+
+## Data coverage
+
+The heatmap below shows the percentage of clean (unflagged, non-NA) data per site × year.
+
+```{r coverage-heatmap, echo=FALSE, fig.height=6, fig.cap="Data coverage heatmap. Green = high coverage, red = low. White cells indicate years with no data."}
+if (file.exists("output/Temperature_clean.csv")) {
+  temp_clean <- fread("output/Temperature_clean.csv")
+  temp_clean[, date := as.POSIXct(date, tz = "Africa/Algiers")]
+  temp_clean[, site := factor(site,
+    levels = c("Skjelingahaugen","Gudmedalen","Lavisdalen","Ulvehaugen",
+               "Veskre","Rambera","Hogsete","Alrust",
+               "Ovstedalen","Arhelleren","Vikesland","Fauske"))]
+  plot_coverage_heatmap(temp_clean)
+} else {
+  message("Run R/02_climate_pipeline.R first to generate Temperature_clean.csv")
+}
+```
+
+---
+
+## Temperature time series
+
+The panels below show the full cleaned time series for all 12 sites. Black dots mark flagged observations (any flag type). The data is not removed — the flags are shown so you can assess whether the flagging was appropriate.
+
+```{r timeseries, echo=FALSE, fig.height=20, fig.width=18, fig.cap="Temperature time series. Red = veg_temp (above-ground), blue = soil_temp. Black dots = flagged observations."}
+if (exists("temp_clean")) {
+  sites_vec <- as.character(unique(temp_clean[logger %in% c("veg_temp","soil_temp")]$site))
+  ts_list   <- lapply(sites_vec, function(s) plot_timeseries_site(temp_clean, s))
+  patchwork::wrap_plots(ts_list, ncol = 3) +
+    patchwork::plot_annotation(title = "Cleaned temperature time series by site")
+} else {
+  message("Run R/02_climate_pipeline.R first.")
+}
+```
+
+---
+
+## Outlier summary
+
+```{r outlier-summary, echo=FALSE, fig.height=8, fig.cap="Number of outlier-flagged observations by site, logger, and year."}
+if (exists("temp_clean")) {
+  plot_outlier_density(temp_clean)
+}
+```
+
+```{r flag-table, echo=FALSE}
+if (exists("temp_clean")) {
+  flag_tbl <- temp_clean[!is.na(flag), .N, by = flag][order(-N)]
+  knitr::kable(flag_tbl, col.names = c("Flag", "Row count"),
+               caption = "Total flagged rows by flag type")
+}
+```
+
+---
+
+## Known data issues and decisions
+
+A summary of the major per-site decisions encoded in `apply_site_overrides()`:
+
+| Site | Issue | Decision |
+|------|-------|----------|
+| **Fauske** | temp1/temp2 always swapped at this station | Manual: temp1→soil, temp2→above throughout |
+| **Fauske** | 2013–2014: temp1 logger removed from soil | Set values to NA |
+| **Fauske** | 2018: above-ground logger exposed to sun | Flag `VarianceProblem_TooHigh` |
+| **Vikesland** | 2015–2017: soil sensor shows excess variance | Flag `VarianceProblem_TooHigh` |
+| **Vikesland** | Oct–Dec 2018: very low values in soil sensor | Set values < −2 °C to NA |
+| **Arhelleren** | Jul 2009 download: labels reversed | Swap temp1↔temp2 for that file |
+| **Ovstedal** | 2016–2017: temp2 sensor has systematic offset | Flag `Bias_Sensor` |
+| **Veskre** | 2014, 2016, 2017 files: labels swapped | Swap temp1↔temp2 for those files |
+| **Rambera** | Before 2014: labels swapped | Manual: temp1→soil, temp2→above |
+| **Hogsete** | 2015–2016 file: very low variance throughout | Flag entire file `VarianceProblem_TooLow` |
+| **Alrust** | Before 2016: labels swapped | Manual: temp1→soil, temp2→above |
+| **Alrust** | 2012–2014: above-ground sensor has too little variance | Flag `VarianceProblem_TooLow` |
+| **Alrust** | 2010 and 2015: soil sensor has too much variance | Flag `VarianceProblem_TooHigh` (bug fix: original code had impossible AND condition) |
+| **Ulvehaugen** | Consistent throughout: temp1=soil, temp2=above | Manual assignment throughout |
+| **Lavisdalen** | Before 2012: labels swapped | Manual: temp1→soil, temp2→above |
+| **Lavisdalen** | 2013–2014: corrupt overlapping file data | Set values to NA |
+| **Lavisdalen** | Above-ground sensor: increasing variance over time | Flag `Bias_IncreasingVarOverTime` |
+| **Gudmedalen** | Before 2015: labels swapped | Manual: temp1→soil, temp2→above |
+| **Gudmedalen** | Jun–Oct 2014 download: labels reversed again | Swap within that specific file |
+| **Gudmedalen** | 2018: bad values in temperature/temperature2 | Set values to NA |
+| **Skjellingahaugen** | 2015–2017 and specific files: labels swapped | Manual swap for affected periods |
+| **Skjellingahaugen** | 2019: 2-second sampling rate file | Set values to NA |
+
+---
+
+## Performance notes
+
+The pipeline uses `data.table` throughout for performance:
+- `rbindlist()` instead of `purrr::map_df()` for binding ~2 500 files
+- `data.table::CJ()` instead of `expand.grid()` for the full hourly time grid
+- All filtering, grouping, and aggregation in data.table syntax
+- `data.table::fwrite()` for fast CSV output
+
+For ~3.5 million hourly temperature rows, the full pipeline typically completes in 10–30 minutes depending on hardware, with the import step (reading ~2 500 files) being the longest.
+
+---
+
+## Future work
+
+The following improvements are planned but not yet implemented:
+
+- **Gap imputation:** Linear interpolation for gaps < 6 hours; seasonal decomposition-based imputation for longer gaps. A natural candidate is the `imputeTS` package. See `# TODO` comment in `R/02_climate_pipeline.R`.
+- **Precipitation processing:** `output/Precipitation_raw.csv` is saved but not cleaned. Precipitation loggers can fail silently (recording zero when broken), making it difficult to distinguish genuine dry periods from sensor failure without independent reference data.
+- **Soil moisture processing:** `output/Soilmoisture_raw.csv` is saved but not cleaned. Calibration offsets vary by site and sensor generation.
+- **Hampel identifier:** Rolling-MAD-based outlier detection (`# TODO` in `flag_outliers()`) for more localised detection than the current monthly IQR approach.
+
+---
+
+## How to reproduce
+
+```r
+# 1. Install required packages if needed
+install.packages(c("data.table", "lubridate", "tidyverse", "patchwork", "readr"))
+
+# 2. Run the pipeline (takes 10–30 min depending on hardware)
+source("R/02_climate_pipeline.R")
+
+# 3. Re-render this README
+rmarkdown::render("README.Rmd")
+```

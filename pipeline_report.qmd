@@ -1,0 +1,365 @@
+---
+title: "SeedClim Climate Data Pipeline Report"
+subtitle: "Import · Cleaning · Quality Control"
+date: "`r Sys.Date()`"
+format:
+  html:
+    self-contained: true
+    toc: true
+    toc-depth: 3
+    toc-title: "Contents"
+    code-fold: true
+    code-summary: "Show code"
+    theme: flatly
+    fig-width: 11
+    fig-height: 6
+    df-print: kable
+execute:
+  warning: true
+  message: true
+  cache: false
+---
+
+```{r setup}
+#| message: false
+#| warning: false
+
+library(data.table)
+library(lubridate)
+library(tidyverse)
+library(patchwork)
+library(knitr)
+
+source("R/functions/02_functions.R")
+source("R/functions/pipeline_steps.R")
+
+dir.create("output/figures", recursive = TRUE, showWarnings = FALSE)
+```
+
+---
+
+## Step 1 — Data Import
+
+Raw `.txt` files are read from two directories:
+
+- **Canonical** (`data/ITAS_UTL_climate_data_2008-2025/`): the primary curated source.
+- **Supplemental** (`data/supplemental_biofelles/`): files that exist only in the
+  BioFelles archive and were identified by `R/00_audit_data_sources.R`.
+
+Known non-data files (documentation, logger config exports, burst-mode
+calibration runs) are excluded via `EXCLUDE_PATTERNS`.
+
+```{r import}
+#| message: false
+import_result <- step_import()
+climate       <- import_result$data
+```
+
+| Source | Files attempted | Rows imported |
+|--------|-----------------|---------------|
+| Canonical | `r import_result$n_files_canonical` | `r format(import_result$n_canonical, big.mark = ",")` |
+| Supplemental | `r import_result$n_files_supplemental` | `r format(import_result$n_supplemental, big.mark = ",")` |
+| **Total** | **`r import_result$n_files_canonical + import_result$n_files_supplemental`** | **`r format(nrow(climate), big.mark = ",")`** |
+
+### Read warnings and errors
+
+Some files produce warnings or errors during import. The table below
+summarises them by category. Files that could not be parsed are dropped;
+files with minor warnings (e.g. an unusual logger label that is a known
+alias) are kept and the issue is resolved automatically in Step 4.
+
+```{r import-warnings}
+if (!is.null(import_result$read_warning_summary)) {
+  kable(
+    import_result$read_warning_summary,
+    col.names = c("Category", "Files affected", "Example files"),
+    caption = paste(
+      "Import warnings grouped by cause.",
+      "Categories containing 'dropped' mean the file was skipped;",
+      "all others were processed successfully."
+    )
+  )
+} else {
+  cat("No warnings or errors during import.")
+}
+```
+
+---
+
+## Step 2 — Cleaning & Deduplication
+
+Three operations are applied in sequence:
+
+1. **Trim sensor warm-up artefacts**: first 2 and last 2 rows of each file are removed.
+2. **Date range filter**: keep 2008-10-01 → 2035-01-01 (removes clock-error dates).
+3. **Deduplication (two passes)**:
+   - *Pass 1* — exact duplicates (same key + value) are dropped.
+   - *Pass 2* — conflicting values for the same timestamp are resolved by preferring
+     the canonical source, then the value closest to the site's monthly median.
+
+```{r clean}
+clean_result <- step_clean(climate)
+climate      <- clean_result$data
+```
+
+**Rows before → after:**
+`r format(clean_result$n_before, big.mark = ",")` →
+`r format(clean_result$n_after, big.mark = ",")`
+(`r format(clean_result$n_before - clean_result$n_after, big.mark = ",")` removed)
+
+```{r clean-conflicts}
+if (!is.null(clean_result$conflict_summary)) {
+  cat("Top conflicting records (largest value difference):\n")
+  kable(head(clean_result$conflict_summary, 20),
+        format.args = list(big.mark = ",", digits = 3))
+} else {
+  cat("No conflicting-value duplicates were found.")
+}
+```
+
+---
+
+## Step 3 — Logger Classification
+
+Each row is classified into one of four categories based on its logger name:
+
+| Category | Saved to |
+|----------|----------|
+| Temperature | (continues through pipeline) |
+| Precipitation | `output/Precipitation_raw.csv` |
+| Soil moisture | `output/Soilmoisture_raw.csv` |
+| Ignored | `power`, `resistance1/2`, `voltage1/2`, `uvb_*` |
+
+Any logger name that does not match a known category triggers a warning.
+
+```{r split}
+split_result <- step_split(climate)
+temperature  <- split_result$temperature
+rm(climate); gc()
+```
+
+| Subset | Rows |
+|--------|------|
+| Temperature | `r format(split_result$n_temp, big.mark = ",")` |
+| Precipitation (saved raw) | `r format(split_result$n_precip, big.mark = ",")` |
+| Soil moisture (saved raw) | `r format(split_result$n_sm, big.mark = ",")` |
+
+```{r split-unclassified}
+if (!is.null(split_result$unclassified_summary)) {
+  cat("Unclassified loggers:\n")
+  kable(split_result$unclassified_summary)
+} else {
+  cat("All logger names were classified successfully.")
+}
+```
+
+---
+
+## Step 4 — Logger Name Normalisation
+
+Variant names (aliases, trailing spaces, encoding artefacts, factory labels)
+are recoded to standard intermediate forms.
+
+Key decisions documented here:
+
+- `PØN` / `PÃ\u0098N` → `temp200cm` (factory UTL label on early 2008 deployments)
+- `300cm` → `temp200cm` (one-file typo in Vikesland logger #002484)
+- `veg temp ` (trailing space) → `tempabove`
+- `temp1` / `temp2` are **kept** at this stage — soil/veg assignment comes next.
+
+```{r normalise}
+norm_result <- step_normalise(temperature)
+temperature <- norm_result$data
+```
+
+**Logger names after normalisation:**
+
+```{r normalise-names}
+cat(paste(norm_result$loggers_after, collapse = "  |  "))
+```
+
+---
+
+## Step 5 + 6 — Soil / Vegetation Temperature Assignment
+
+### Approach
+
+For files with paired `temp1` / `temp2` sensors, soil temperature has lower
+variance (buffered by the ground) while above-ground temperature has higher
+variance. Two complementary methods are used:
+
+1. **Manual site overrides** (Step 5): documented knowledge about logger
+   placement at specific sites or files. All changes are recorded in the
+   `logger_swap` column for full traceability.
+2. **Automated variance-based assignment** (Step 6): for any remaining
+   unassigned pairs, the channel with lower variance → `tempsoil`, higher
+   → `tempabove`.
+
+A **pre-assignment variance snapshot** is captured before any overrides to
+serve as an objective statistical reference, and a **post-assignment audit**
+checks all assigned pairs (manual and automated) for cases where
+`var(soil) > var(above)`.
+
+```{r assign}
+assign_result <- step_assign(temperature)
+temperature   <- assign_result$data
+```
+
+### Pre-assignment variance snapshot
+
+```{r assign-pre}
+if (!is.null(assign_result$var_pre_wide)) {
+  kable(
+    assign_result$var_pre_wide[!is.na(var_ratio)][order(site, file)],
+    digits = 3,
+    caption = "Variance ratios (temp1/temp2) before any assignment"
+  )
+} else {
+  cat("No temp1/temp2 pairs found in this dataset.")
+}
+```
+
+### Post-assignment audit
+
+```{r assign-post}
+if (!is.null(assign_result$var_post_wide)) {
+  kable(
+    assign_result$var_post_wide[order(site, file)],
+    digits = 3,
+    caption = "Variance audit after assignment (var_ratio_assigned = tempsoil/tempabove; values > 1 are suspicious)"
+  )
+} else {
+  cat("No tempsoil/tempabove pairs found.")
+}
+```
+
+```{r assign-suspicious}
+if (!is.null(assign_result$suspicious) && nrow(assign_result$suspicious) > 0) {
+  cat(
+    "WARNING:", nrow(assign_result$suspicious),
+    "file(s) have var(soil) > var(above) and were flagged",
+    "'SuspiciousAssignment_SoilHigherVariance':\n"
+  )
+  kable(assign_result$suspicious)
+} else {
+  cat("OK: All assigned pairs passed the variance check.")
+}
+```
+
+---
+
+## Step 7 — Outlier Detection & Gap Flagging
+
+Three flagging criteria are applied (flags do **not** remove data; they
+annotate the `flag` column):
+
+1. **Global range filter**: values outside physically plausible bounds.
+2. **Rate-of-change filter**: implausible jumps between consecutive readings.
+3. **Monthly IQR filter**: values > 3 IQR from the monthly median.
+
+Data gaps are recorded separately in the same `flag` column.
+
+```{r flag}
+flag_result <- step_flag(temperature)
+temperature <- flag_result$data
+```
+
+**`r format(flag_result$n_flagged, big.mark = ",")` rows flagged
+(`r flag_result$pct_flagged`% of all temperature rows)**
+
+```{r flag-summary}
+kable(
+  flag_result$flag_summary,
+  col.names = c("Flag", "N rows"),
+  format.args = list(big.mark = ","),
+  caption = "Flag breakdown"
+)
+```
+
+---
+
+## Step 8 — Final Output
+
+Remaining steps before saving:
+
+- Zero out pre-2009 `temp30cm` readings (sensor installation artefacts).
+- Remove rows where `value` is `NA`.
+- Apply default assignment for single-channel files (documented in `logger_swap`).
+- Rename to final canonical logger names (`veg_temp`, `soil_temp`, `temp30cm`, `temp200cm`).
+- Drop the first 30 observations per site (sensor stabilisation at deployment start).
+- Fill a complete hourly time grid — gaps appear as `NA` values in the output.
+
+```{r finalise}
+final_result      <- step_finalise(temperature)
+temperature_clean <- final_result$data
+```
+
+| Metric | Value |
+|--------|-------|
+| Final row count | `r format(final_result$n_final, big.mark = ",")` |
+| Date range | `r format(final_result$date_min, "%Y-%m-%d")` — `r format(final_result$date_max, "%Y-%m-%d")` |
+| Logger types | `r paste(final_result$loggers, collapse = ", ")` |
+| Output file | `output/Temperature_clean.csv` |
+
+### Observations per site and logger
+
+```{r finalise-summary}
+site_summary <- temperature_clean[
+  !is.na(value),
+  .(n_obs = .N, n_years = uniqueN(year(date))),
+  by = .(site, logger)
+][order(site, logger)]
+
+kable(
+  site_summary,
+  col.names = c("Site", "Logger", "Observations", "Years"),
+  format.args = list(big.mark = ",")
+)
+```
+
+---
+
+## Step 9 — Diagnostic Plots
+
+```{r plots}
+#| fig-height: 8
+#| message: false
+
+var_summary <- if (file.exists("output/variance_assignment_audit.csv")) {
+  vs <- fread("output/variance_assignment_audit.csv")
+  # plot_variance_ratios() expects a column named 'assignment';
+  # the audit CSV stores the equivalent under 'stat_suggestion'
+  if ("stat_suggestion" %in% names(vs) && !"assignment" %in% names(vs)) {
+    data.table::setnames(vs, "stat_suggestion", "assignment")
+  }
+  vs
+} else {
+  NULL
+}
+
+plots <- plot_climate_summary(temperature_clean, var_summary = var_summary)
+```
+
+*All plots are also saved as PNG files in `output/figures/`.*
+
+---
+
+## Output Files
+
+| File | Contents |
+|------|----------|
+| `output/Temperature_clean.csv` | Cleaned hourly temperature, full time grid with NAs for gaps, `flag` and `logger_swap` columns |
+| `output/Precipitation_raw.csv` | Raw precipitation — unprocessed, clean separately |
+| `output/Soilmoisture_raw.csv` | Raw soil moisture — unprocessed, clean separately |
+| `output/variance_assignment_audit.csv` | Per-file variance ratios and assignment audit |
+| `output/dedup_conflicts.csv` | Conflicting-value duplicates from deduplication (if any) |
+| `output/unclassified_loggers.csv` | Logger names not matched to any category (if any) |
+| `output/figures/` | Diagnostic plot PNGs |
+
+---
+
+## Session Info
+
+```{r session-info}
+sessionInfo()
+```
