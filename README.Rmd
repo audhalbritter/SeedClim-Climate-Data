@@ -383,12 +383,17 @@ if (file.exists("output/Temperature_clean.csv")) {
 
 ## Temperature time series
 
-```{r timeseries, echo=FALSE, fig.height=20, fig.width=18, fig.cap="Full temperature time series. Red = veg_temp, blue = soil_temp. Black dots = flagged observations."}
+```{r timeseries, echo=FALSE, fig.height=10, fig.width=16, fig.cap="Above-ground and soil temperature on the SeedClim 3 × 4 climate grid."}
 if (exists("temp_clean")) {
-  sites_vec <- as.character(unique(temp_clean[logger %in% c("veg_temp","soil_temp")]$site))
-  ts_list   <- lapply(sites_vec, function(s) plot_timeseries_site(temp_clean, s))
-  patchwork::wrap_plots(ts_list, ncol = 3) +
-    patchwork::plot_annotation(title = "Cleaned temperature time series by site")
+  plot_timeseries_veg_soil(temp_clean)
+} else {
+  message("Run the pipeline first.")
+}
+```
+
+```{r timeseries-deep, echo=FALSE, fig.height=10, fig.width=16, fig.cap="Deep temperature loggers (30 cm and 200 cm) on the SeedClim 3 × 4 climate grid."}
+if (exists("temp_clean")) {
+  plot_timeseries_deep(temp_clean)
 } else {
   message("Run the pipeline first.")
 }

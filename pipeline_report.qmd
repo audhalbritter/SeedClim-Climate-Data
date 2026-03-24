@@ -377,14 +377,11 @@ kable(
 
 ## Step 9 — Diagnostic Plots
 
-```{r plots}
-#| fig-height: 8
+```{r plots-build}
 #| message: false
 
 var_summary <- if (file.exists("output/variance_assignment_audit.csv")) {
   vs <- fread("output/variance_assignment_audit.csv")
-  # plot_variance_ratios() expects a column named 'assignment';
-  # the audit CSV stores the equivalent under 'stat_suggestion'
   if ("stat_suggestion" %in% names(vs) && !"assignment" %in% names(vs)) {
     data.table::setnames(vs, "stat_suggestion", "assignment")
   }
@@ -397,6 +394,67 @@ plots <- plot_climate_summary(temperature_clean, var_summary = var_summary)
 ```
 
 *All plots are also saved as PNG files in `output/figures/`.*
+
+### Coverage heatmap
+
+Percentage of clean (unflagged, non-NA) hourly observations per site and year.
+
+```{r plot-coverage}
+#| fig-width: 12
+#| fig-height: 6
+plots$coverage
+```
+
+### Temperature time series — above-ground and soil
+
+Above-ground (`veg_temp`, red) and soil (`soil_temp`, blue) temperature for all
+12 sites arranged on the SeedClim 3 × 4 climate grid. Rows show habitat
+(Alpine / Sub-alpine / Boreal); columns show mean annual precipitation from the
+30-year normal (mm). Lines break naturally at data gaps.
+
+```{r plot-timeseries-veg-soil}
+#| fig-width: 16
+#| fig-height: 10
+plots$ts_veg_soil
+```
+
+### Temperature time series — deep loggers (30 cm and 200 cm)
+
+30 cm (orange) and 200 cm (green) temperature loggers. Same climate-grid layout
+as above (habitat × precipitation mm). Panels are empty where those logger
+types were not deployed at a site.
+
+```{r plot-timeseries-deep}
+#| fig-width: 16
+#| fig-height: 10
+plots$ts_deep
+```
+
+### Variance ratios (soil/veg assignment)
+
+One point per file that entered the automated variance test. Points outside the
+dashed thresholds (0.80 and 1.25) were automatically assigned; points between
+them were ambiguous.
+
+```{r plot-variance}
+#| fig-width: 14
+#| fig-height: 8
+if (!is.null(plots$variance)) {
+  plots$variance
+} else {
+  cat("No variance ratio data available.")
+}
+```
+
+### Outlier density
+
+Number of flagged rows per site, logger type, and year.
+
+```{r plot-outliers}
+#| fig-width: 14
+#| fig-height: 8
+plots$outliers
+```
 
 ---
 

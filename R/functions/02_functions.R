@@ -983,26 +983,117 @@ plot_coverage_heatmap <- function(dt) {
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
 }
 
-# --- Time series for one site, with flagged points highlighted ---
-plot_timeseries_site <- function(dt, site_name) {
-  plot_dt   <- dt[site == site_name &
-                    logger %in% c("veg_temp", "soil_temp") &
-                    !is.na(value)]
-  flagged_dt <- plot_dt[!is.na(flag)]
+# Lookup table for the SeedClim 3 (temperature) × 4 (precipitation) climate
+# grid.  Temperature level 1 = coldest/alpine, 3 = warmest/boreal.
+# Precipitation level 1 = driest, 4 = wettest.
+# precipitation_mm: design values (700 / 1400 / 2100 / 2800 mm) used to
+# select sites along the precipitation gradient.
+SITE_CLIMATE_GRID <- data.table::data.table(
+  site = c(
+    "Ulvehaugen",    "Lavisdalen",  "Gudmedalen",    "Skjelingahaugen",
+    "Alrust",        "Hogsete",     "Rambera",        "Veskre",
+    "Fauske",        "Vikesland",   "Arhelleren",     "Ovstedalen"
+  ),
+  temperature_level   = c(1L, 1L, 1L, 1L,
+                           2L, 2L, 2L, 2L,
+                           3L, 3L, 3L, 3L),
+  precipitation_level = c(1L, 2L, 3L, 4L,
+                           1L, 2L, 3L, 4L,
+                           1L, 2L, 3L, 4L),
+  habitat             = c(rep("alpine",     4L),
+                           rep("sub-alpine", 4L),
+                           rep("boreal",     4L)),
+  precipitation_mm    = c( 700L, 1400L, 2100L, 2800L,
+                            700L, 1400L, 2100L, 2800L,
+                            700L, 1400L, 2100L, 2800L)
+)
+# Factor levels keep the ecological gradient direction in plots
+SITE_CLIMATE_GRID[, habitat := factor(
+  habitat, levels = c("alpine", "sub-alpine", "boreal")
+)]
+
+# Shared theme for both climate-grid time series plots
+.ts_theme <- function() {
+  list(
+    ggplot2::theme_bw(base_size = 13),
+    ggplot2::theme(
+      legend.position = "bottom",
+      strip.text      = ggplot2::element_text(size = 11, face = "bold"),
+      axis.text.x     = ggplot2::element_text(angle = 45, hjust = 1),
+      panel.spacing   = ggplot2::unit(0.4, "lines")
+    )
+  )
+}
+
+# Helper: join dt with the climate grid and keep NA rows for gap breaks
+.ts_prep <- function(dt, loggers) {
+  # Keep NA-value rows so geom_line breaks at gaps; only drop unknown loggers
+  plot_dt <- dt[logger %in% loggers]
+  # Convert site to character for the merge (it may be a factor)
+  plot_dt[, site_chr := as.character(site)]
+  grid    <- data.table::copy(SITE_CLIMATE_GRID)
+  data.table::setnames(grid, "site", "site_chr")
+  plot_dt <- grid[plot_dt, on = "site_chr"]
+  plot_dt[, site_chr := NULL]
+  plot_dt
+}
+
+# --- Time series: above-ground (veg_temp) and soil (soil_temp) ---
+# Faceted on the 3 × 4 SeedClim climate grid
+# (rows = temperature level, columns = precipitation level).
+plot_timeseries_veg_soil <- function(dt) {
+  plot_dt <- .ts_prep(dt, c("veg_temp", "soil_temp"))
+  plot_dt[, logger := factor(logger, levels = c("veg_temp", "soil_temp"))]
 
   ggplot2::ggplot(plot_dt,
                   ggplot2::aes(x = date, y = value, colour = logger)) +
-    ggplot2::geom_line(alpha = 0.5, linewidth = 0.2) +
-    ggplot2::geom_point(data = flagged_dt,
-                        ggplot2::aes(shape = "flagged"),
-                        size = 1.2, alpha = 0.7, colour = "black") +
+    ggplot2::geom_line(alpha = 0.7, linewidth = 0.35, na.rm = TRUE) +
     ggplot2::scale_colour_manual(
-      values = c("veg_temp" = "#d7191c", "soil_temp" = "#2c7bb6")
+      values = c("veg_temp" = "#d7191c", "soil_temp" = "#2c7bb6"),
+      labels = c("veg_temp" = "Above-ground", "soil_temp" = "Soil")
     ) +
-    ggplot2::labs(title = site_name, x = NULL, y = "Temperature (\u00b0C)",
-                  colour = "Logger", shape = NULL) +
-    ggplot2::theme_bw(base_size = 10) +
-    ggplot2::theme(legend.position = "bottom")
+    ggplot2::facet_grid(
+      habitat ~ precipitation_mm,
+      labeller = ggplot2::labeller(
+        precipitation_mm = function(x) paste0(x, " mm")
+      )
+    ) +
+    ggplot2::labs(
+      title    = "Above-ground and soil temperature",
+      subtitle = "Rows: habitat (temperature gradient). Columns: mean annual precipitation (30-yr normal).",
+      x        = NULL,
+      y        = "Temperature (\u00b0C)",
+      colour   = NULL
+    ) +
+    .ts_theme()
+}
+
+# --- Time series: deep loggers (temp30cm and temp200cm) ---
+plot_timeseries_deep <- function(dt) {
+  plot_dt <- .ts_prep(dt, c("temp30cm", "temp200cm"))
+  plot_dt[, logger := factor(logger, levels = c("temp30cm", "temp200cm"))]
+
+  ggplot2::ggplot(plot_dt,
+                  ggplot2::aes(x = date, y = value, colour = logger)) +
+    ggplot2::geom_line(alpha = 0.7, linewidth = 0.35, na.rm = TRUE) +
+    ggplot2::scale_colour_manual(
+      values = c("temp30cm" = "#f46d43", "temp200cm" = "#1a9850"),
+      labels = c("temp30cm" = "30 cm", "temp200cm" = "200 cm")
+    ) +
+    ggplot2::facet_grid(
+      habitat ~ precipitation_mm,
+      labeller = ggplot2::labeller(
+        precipitation_mm = function(x) paste0(x, " mm")
+      )
+    ) +
+    ggplot2::labs(
+      title    = "Deep temperature loggers (30 cm and 200 cm)",
+      subtitle = "Rows: habitat (temperature gradient). Columns: mean annual precipitation (30-yr normal).",
+      x        = NULL,
+      y        = "Temperature (\u00b0C)",
+      colour   = NULL
+    ) +
+    .ts_theme()
 }
 
 # --- Variance ratio diagnostic: one point per file, coloured by assignment ---
@@ -1061,15 +1152,17 @@ plot_climate_summary <- function(dt, var_summary = NULL,
                   p_cov, width = 12, height = 6, dpi = 150)
   message("  Saved 01_coverage_heatmap.png")
 
-  sites     <- as.character(unique(dt[logger %in% c("veg_temp", "soil_temp")]$site))
-  ts_plots  <- lapply(sites, function(s) plot_timeseries_site(dt, s))
-  names(ts_plots) <- sites
-  ts_combined <- patchwork::wrap_plots(ts_plots, ncol = 3) +
-    patchwork::plot_annotation(title = "Temperature time series by site")
-  ggplot2::ggsave(file.path(output_dir, "02_timeseries_all_sites.png"),
-                  ts_combined, width = 18, height = 20, dpi = 150)
-  message("  Saved 02_timeseries_all_sites.png")
+  ts_veg_soil <- plot_timeseries_veg_soil(dt)
+  ggplot2::ggsave(file.path(output_dir, "02a_timeseries_veg_soil.png"),
+                  ts_veg_soil, width = 16, height = 10, dpi = 150)
+  message("  Saved 02a_timeseries_veg_soil.png")
 
+  ts_deep <- plot_timeseries_deep(dt)
+  ggplot2::ggsave(file.path(output_dir, "02b_timeseries_deep.png"),
+                  ts_deep, width = 16, height = 10, dpi = 150)
+  message("  Saved 02b_timeseries_deep.png")
+
+  p_var <- NULL
   if (!is.null(var_summary) && nrow(var_summary) > 0) {
     p_var <- plot_variance_ratios(var_summary)
     if (!is.null(p_var)) {
@@ -1084,7 +1177,11 @@ plot_climate_summary <- function(dt, var_summary = NULL,
                   p_out, width = 14, height = 8, dpi = 150)
   message("  Saved 04_outlier_density.png")
 
-  invisible(list(coverage  = p_cov,
-                 timeseries = ts_plots,
-                 outliers  = p_out))
+  invisible(list(
+    coverage     = p_cov,
+    ts_veg_soil  = ts_veg_soil,
+    ts_deep      = ts_deep,
+    variance     = p_var,
+    outliers     = p_out
+  ))
 }
