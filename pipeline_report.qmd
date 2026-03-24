@@ -246,11 +246,10 @@ if (!is.null(assign_result$var_post_wide)) {
 ```
 
 Pass 2 auto-corrects any assigned pair where `var(tempsoil) / var(tempabove) > 1.25`
-*and* both channels have at least 48 observations. The flag
-`SuspiciousAssignment_SoilHigherVariance` is only set for files that remain
-problematic **after** Pass 2 — the most common reason is that one channel has
-fewer than 48 observations (too short for a reliable variance estimate). These
-files need a manual override in `apply_site_overrides()`.
+*and* both channels have at least 48 observations. The `proc_flag`
+`SuspiciousAssignment` is only set for files that remain problematic **after**
+Pass 2 — the most common reason is that one channel has fewer than 48
+observations. These files need a manual override in `apply_site_overrides()`.
 
 ```{r assign-suspicious}
 if (!is.null(assign_result$suspicious) && nrow(assign_result$suspicious) > 0) {
@@ -258,7 +257,7 @@ if (!is.null(assign_result$suspicious) && nrow(assign_result$suspicious) > 0) {
     "WARNING:", nrow(assign_result$suspicious),
     "file(s) still have var(soil) > var(above) x 1.25 after auto-correction",
     "(likely too few observations for Pass 2 to act).",
-    "Flag: 'SuspiciousAssignment_SoilHigherVariance'.\n"
+    "proc_flag set to 'SuspiciousAssignment'.\n"
   )
   kable(assign_result$suspicious)
 } else {
@@ -268,7 +267,7 @@ if (!is.null(assign_result$suspicious) && nrow(assign_result$suspicious) > 0) {
 
 ### Still-unassigned files
 
-Assignment is attempted in three tiers before reaching Step 8:
+Assignment is attempted in four tiers before a default is applied:
 
 1. **Manual override** — documented knowledge in `apply_site_overrides()`.
 2. **Automated variance test** — the channel with clearly lower variance is
@@ -280,8 +279,8 @@ Assignment is attempted in three tiers before reaching Step 8:
 Files in the table below reached none of the three tiers (neighbours disagreed
 or one is missing). They receive a **default assignment** in Step 8
 (`temp1` → `veg_temp`, `temp2` → `soil_temp`) and are flagged
-`VarianceProblem_TooSimilar`. If you know the correct assignment, add it as a
-manual override in `apply_site_overrides()`.
+`proc_flag = "AmbiguousAssignment"`. If you know the correct assignment, add it
+as a manual override in `apply_site_overrides()`.
 
 > **Note:** neighbour consensus assumes the same physical logger was in place
 > across the gap. If loggers were swapped during a download visit the assignment
@@ -303,14 +302,18 @@ if (nrow(assign_result$unassigned_files) > 0L) {
 
 ## Step 7 — Outlier Detection & Gap Flagging
 
-Three flagging criteria are applied (flags do **not** remove data; they
-annotate the `flag` column):
+Three automated criteria write to the **`flag`** column.  Flags do **not**
+remove data; flagged rows are retained and annotated.
 
-1. **Global range filter**: values outside physically plausible bounds.
-2. **Rate-of-change filter**: implausible jumps between consecutive readings.
-3. **Monthly IQR filter**: values > 3 IQR from the monthly median.
+| Flag | Criterion |
+|------|-----------|
+| `Outlier_Range` | Value outside physical bounds (veg: −40–+50 °C; soil: −20–+35 °C) |
+| `Outlier_RateOfChange` | Adjacent hourly readings differ by > 5 °C |
+| `Outlier_IQR` | Outside Q1 − 3×IQR … Q3 + 3×IQR for same site × logger × month |
 
-Data gaps are recorded separately in the same `flag` column.
+Note: assignment-related processing decisions (`AmbiguousAssignment`,
+`SuspiciousAssignment`) were written to the separate **`proc_flag`** column in
+Steps 5–6 and do not appear here.
 
 ```{r flag}
 flag_result <- step_flag(temperature)

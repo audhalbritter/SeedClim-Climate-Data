@@ -34,7 +34,6 @@
 #  - apply_site_overrides(): all per-site manual corrections encoded here;
 #    every change written to logger_swap for full auditability.
 #  - flag_outliers(): global range, rate-of-change, monthly IQR checks.
-#  - flag_gaps(): marks gaps > 72 h in the cleaned time series.
 #  - plot_*() functions: diagnostic visualisations used in pipeline_report.qmd.
 ################################################################################
 
@@ -43,9 +42,9 @@ utils::globalVariables(c(
   ".", ".N", ".SD",
   "Label", "X1", "X2",
   "site", "logger", "value", "date", "file", "type", "Repo", "source_repo",
-  "flag", "logger_swap",
+  "flag", "proc_flag", "logger_swap",
   "temp1", "temp2", "var_val", "n_obs", "var_ratio", "assignment",
-  "delta", "gap_next",
+  "delta",
   "month_q25", "month_q75", "month_iqr",
   "pct_clean", "n_clean", "n_total", "n_flagged",
   "year", "n_outliers",
@@ -477,6 +476,7 @@ assign_soil_veg_loggers <- function(dt) {
   # than above-ground, meaning the current assignment is inverted.
 
   if (!"logger_swap" %in% names(dt)) dt[, logger_swap := NA_character_]
+  if (!"proc_flag"   %in% names(dt)) dt[, proc_flag   := NA_character_]
 
   # ------------------------------------------------------------------
   # Pass 1: assign still-unassigned temp1/temp2 pairs by variance
@@ -520,9 +520,9 @@ assign_soil_veg_loggers <- function(dt) {
                                  " (temp2\u2192soil)"))]
 
     dt[logger %in% c("temp1", "temp2") & assignment == "ambiguous",
-       flag := data.table::fifelse(
-         is.na(flag), "VarianceProblem_TooSimilar",
-         paste(flag, "VarianceProblem_TooSimilar", sep = "|"))]
+       proc_flag := data.table::fifelse(
+         is.na(proc_flag), "AmbiguousAssignment",
+         paste(proc_flag, "AmbiguousAssignment", sep = "|"))]
 
     dt[, c("var_ratio", "assignment") := NULL]
 
@@ -616,6 +616,7 @@ assign_soil_veg_loggers <- function(dt) {
 apply_site_overrides <- function(dt) {
 
   if (!"flag"        %in% names(dt)) dt[, flag        := NA_character_]
+  if (!"proc_flag"   %in% names(dt)) dt[, proc_flag   := NA_character_]
   if (!"logger_swap" %in% names(dt)) dt[, logger_swap := NA_character_]
 
   # ===== FAUSKE =====
@@ -627,20 +628,6 @@ apply_site_overrides <- function(dt) {
                    "Fauske_ITAS_14.5.14-14.10.14.txt") &
        logger == "temp1",
      value := NA_real_]
-
-  dt[site == "fau" &
-       file %in% c("fauske_climate 20150129 - 20150429.txt",
-                   "fauske_climate 20150429 - 20151009.txt",
-                   "Fauske_temp_Fall2016.txt",
-                   "fauske_climate_spring2016.txt") &
-       logger %in% c("temp1", "tempsoil"),
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem_TooLow",
-                                 paste(flag, "VarianceProblem_TooLow", sep = "|"))]
-
-  dt[site == "fau" & file == "Fauske_temp_Fall2016.txt" &
-       logger %in% c("temp2", "tempabove"),
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem",
-                                 paste(flag, "VarianceProblem", sep = "|"))]
 
   dt[site == "fau" & logger %in% c("temp1", "thermistor 2"),
      `:=`(logger      = "tempsoil",
@@ -660,21 +647,7 @@ apply_site_overrides <- function(dt) {
      `:=`(logger      = "tempsoil",
           logger_swap = "ManualSwap: Fauske extra 2016 — CORRECTION temp2 is soil (~15\u00b0C); overrides site-wide rule")]
 
-  dt[site == "fau" & lubridate::year(date) == 2018 & logger == "tempabove",
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem_TooHigh",
-                                 paste(flag, "VarianceProblem_TooHigh", sep = "|"))]
-
   # ===== VIKESLAND =====
-  dt[site == "vik" &
-       file %in% c("Vikesland_climate 20150428 - 20151007.txt",
-                   "Vikesland_climate_spring2016.txt",
-                   "Vikesland_climate_Fall2016.txt",
-                   "Vikesland_climate.txt",
-                   "Vikesland_climate_autumn2017.txt") &
-       logger == "temp2",
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem_TooHigh",
-                                 paste(flag, "VarianceProblem_TooHigh", sep = "|"))]
-
   # Remove physically implausible low values Oct–Dec 2018
   dt[site == "vik" &
        date > as.POSIXct("2018-10-01", tz = "Africa/Algiers") &
@@ -691,11 +664,6 @@ apply_site_overrides <- function(dt) {
      `:=`(logger      = "tempabove",
           logger_swap = "ManualSwap: Arhelleren Jul 2009 — labels reversed in download")]
 
-  dt[site == "arh" & lubridate::year(date) >= 2018 &
-       logger %in% c("temp1", "tempabove"),
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem_TooHigh",
-                                 paste(flag, "VarianceProblem_TooHigh", sep = "|"))]
-
   # ===== OVSTEDAL =====
   dt[site == "ovs" &
        file %in% c("Ovstedal_met1_20160511_20160523.txt",
@@ -707,8 +675,13 @@ apply_site_overrides <- function(dt) {
                    "\u00d8vstedal_met1_autumn2017.txt",
                    "\u00d8vstedal_met1.txt") &
        logger == "temp2",
-     flag := data.table::fifelse(is.na(flag), "Bias_Sensor",
-                                 paste(flag, "Bias_Sensor", sep = "|"))]
+     logger_swap := data.table::fifelse(
+       is.na(logger_swap),
+       "KnownIssue: Ovstedal temp2 systematic offset 2016-2017",
+       paste(logger_swap,
+             "KnownIssue: Ovstedal temp2 systematic offset 2016-2017",
+             sep = "; ")
+     )]
 
   dt[site == "ovs" &
        logger %in% c("temp200cm", "temp30cm") &
@@ -734,13 +707,6 @@ apply_site_overrides <- function(dt) {
      `:=`(logger      = "tempsoil",
           logger_swap = "ManualSwap: Veskre — temp1\u2192soil (2014/2016/2017 files)")]
 
-  dt[site == "ves" &
-       logger %in% c("temp1", "tempsoil") &
-       file %in% c("Veskre_climate 20150909 - 20151011.txt",
-                   "Veskre_climate.txt"),
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem_TooLow",
-                                 paste(flag, "VarianceProblem_TooLow", sep = "|"))]
-
   # These files pair "temperature" (soil) with "veg. temp" (above-ground).
   # Both filename variants cover the same logger; oct2021 was missing from the rule.
   dt[file %in% c("Veskre_klima.txt", "Veskre_klima_oct2021.txt") &
@@ -764,31 +730,15 @@ apply_site_overrides <- function(dt) {
      `:=`(logger      = "tempabove",
           logger_swap = "ManualSwap: Rambera — temp2\u2192above for years \u22642013")]
 
-  dt[site == "ram" &
-       logger %in% c("temp2", "tempabove") &
-       file == "Rambera_met1.txt" &
-       date < as.POSIXct("2016-05-24 18:00:00", tz = "Africa/Algiers"),
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem_TooHigh",
-                                 paste(flag, "VarianceProblem_TooHigh", sep = "|"))]
-
-  dt[site == "ram" &
-       lubridate::year(date) == 2020 & lubridate::month(date) == 6 &
-       logger %in% c("temp2", "tempsoil"),
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem_TooHigh",
-                                 paste(flag, "VarianceProblem_TooHigh", sep = "|"))]
-
   dt[site == "ram" & lubridate::year(date) == 2009 &
        logger == "temp200cm" & !is.na(value) & value > 35,
      value := NA_real_]
 
   # ===== HOGSETE =====
-  dt[file == "H\u00f8gsete_met1_2015_2016.txt",
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem_TooLow",
-                                 paste(flag, "VarianceProblem_TooLow", sep = "|"))]
+  # Hogsete 2015-2016: temp2 had physically implausible values < -5 °C
   dt[file == "H\u00f8gsete_met1_2015_2016.txt" &
        logger == "temp2" & !is.na(value) & value < -5,
-     flag := data.table::fifelse(is.na(flag), "WrongValues_TooLow",
-                                 paste(flag, "WrongValues_TooLow", sep = "|"))]
+     value := NA_real_]
 
   # ===== ALRUST =====
   # Before 2016: loggers were swapped in the field
@@ -798,20 +748,6 @@ apply_site_overrides <- function(dt) {
   dt[site == "alr" & lubridate::year(date) < 2016 & logger == "temp2",
      `:=`(logger      = "tempabove",
           logger_swap = "ManualSwap: Alrust — temp2\u2192above for years <2016")]
-
-  dt[site == "alr" &
-       logger %in% c("temp1", "tempabove") &
-       lubridate::year(date) > 2011 & lubridate::year(date) < 2015,
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem_TooLow",
-                                 paste(flag, "VarianceProblem_TooLow", sep = "|"))]
-
-  # Bug fix from original: was `year == 2010 & year == 2015` (always FALSE).
-  # Corrected to: year %in% c(2010, 2015)
-  dt[site == "alr" &
-       logger %in% c("temp2", "tempsoil") &
-       lubridate::year(date) %in% c(2010, 2015),
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem_TooHigh",
-                                 paste(flag, "VarianceProblem_TooHigh", sep = "|"))]
 
   dt[site == "alr" & lubridate::year(date) == 2009 &
        logger == "temp200cm" & !is.na(value) & value > 30,
@@ -849,10 +785,6 @@ apply_site_overrides <- function(dt) {
      `:=`(logger      = "tempsoil",
           logger_swap = "ManualSwap: Lavisdalen — temperature2\u2192tempsoil")]
 
-  dt[site == "lav" & logger %in% c("temp1", "tempabove"),
-     flag := data.table::fifelse(is.na(flag), "Bias_IncreasingVarOverTime",
-                                 paste(flag, "Bias_IncreasingVarOverTime", sep = "|"))]
-
   dt[site == "lav" &
        logger %in% c("temp1", "temp2", "tempabove", "tempsoil") &
        lubridate::year(date) > 2012 & lubridate::year(date) < 2014,
@@ -860,13 +792,6 @@ apply_site_overrides <- function(dt) {
 
   # Remove time-machine observations (date parse error produced year > 2035)
   dt <- dt[lubridate::year(date) < 2035]
-
-  dt[site == "lav" & lubridate::year(date) == 2021 & logger == "tempsoil",
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem_TooHigh",
-                                 paste(flag, "VarianceProblem_TooHigh", sep = "|"))]
-  dt[site == "lav" & lubridate::year(date) == 2021 & logger == "tempabove",
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem_TooLow",
-                                 paste(flag, "VarianceProblem_TooLow", sep = "|"))]
 
   # ===== GUDMEDALEN =====
   dt <- dt[!(site == "gud" & logger == "jord-5cm")]
@@ -895,10 +820,6 @@ apply_site_overrides <- function(dt) {
      `:=`(logger      = "tempabove",
           logger_swap = "ManualSwap: Gudmedalen_140619_141013 — labels reversed in this download")]
 
-  dt[file == "Gudmedalen_ITAS_140619_141013.txt" & logger == "tempabove",
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem_TooLow",
-                                 paste(flag, "VarianceProblem_TooLow", sep = "|"))]
-
   # Site-wide rule: all Gudmedalen files that use the "temperature" / "temperature2"
   # column labels follow the same convention — temperature = above, temperature2 = soil.
   # (Supersedes earlier file-specific and year-specific rules for the same mapping.)
@@ -910,14 +831,6 @@ apply_site_overrides <- function(dt) {
           logger_swap = "ManualSwap: Gudmedalen — temperature2\u2192tempsoil (all files)")]
 
   # ===== SKJELLINGAHAUGEN =====
-  dt[site == "skj" & lubridate::year(date) == 2014 & logger == "temp1",
-     flag := data.table::fifelse(is.na(flag), "VarianceProblem_TooLow",
-                                 paste(flag, "VarianceProblem_TooLow", sep = "|"))]
-  dt[site == "skj" & lubridate::year(date) == 2012 &
-       logger %in% c("temp1", "temp2"),
-     flag := data.table::fifelse(is.na(flag), "Bias_FewDataPoints",
-                                 paste(flag, "Bias_FewDataPoints", sep = "|"))]
-
   skj_swap_files <- c(
     "Skjellingahaugen_met1 20141016 - 20150121.txt",
     "Skjellingahaugen_met1_20150806 - 20150814.txt",
@@ -996,18 +909,18 @@ flag_outliers <- function(dt,
   # 1. Global range
   dt[logger %in% c("tempabove", "veg_temp", "temp1", "temp2") &
        !is.na(value) & (value < temp_min | value > temp_max),
-     flag := data.table::fifelse(is.na(flag), "Outlier_GlobalRange",
-                                 paste(flag, "Outlier_GlobalRange", sep = "|"))]
+     flag := data.table::fifelse(is.na(flag), "Outlier_Range",
+                                 paste(flag, "Outlier_Range", sep = "|"))]
 
   dt[logger %in% c("tempsoil", "soil_temp", "temp30cm") &
        !is.na(value) & (value < soil_min | value > soil_max),
-     flag := data.table::fifelse(is.na(flag), "Outlier_GlobalRange",
-                                 paste(flag, "Outlier_GlobalRange", sep = "|"))]
+     flag := data.table::fifelse(is.na(flag), "Outlier_Range",
+                                 paste(flag, "Outlier_Range", sep = "|"))]
 
   dt[logger == "temp200cm" &
        !is.na(value) & (value < temp_min | value > temp_max),
-     flag := data.table::fifelse(is.na(flag), "Outlier_GlobalRange",
-                                 paste(flag, "Outlier_GlobalRange", sep = "|"))]
+     flag := data.table::fifelse(is.na(flag), "Outlier_Range",
+                                 paste(flag, "Outlier_Range", sep = "|"))]
 
   # 2. Rate of change (per site × logger, sorted by date)
   dt[, delta := c(NA_real_, abs(diff(value))), by = .(site, logger)]
@@ -1045,21 +958,6 @@ flag_outliers <- function(dt,
   return(dt)
 }
 
-
-#### FLAG DATA GAPS ####
-# Marks the observation just before a gap longer than gap_hours.
-
-flag_gaps <- function(dt, gap_hours = 72) {
-  data.table::setkey(dt, site, logger, date)
-  dt[, gap_next := as.numeric(difftime(
-    data.table::shift(date, type = "lead"), date, units = "hours"
-  )), by = .(site, logger)]
-  dt[!is.na(gap_next) & gap_next > gap_hours,
-     flag := data.table::fifelse(is.na(flag), "Missing_Gap",
-                                 paste(flag, "Missing_Gap", sep = "|"))]
-  dt[, gap_next := NULL]
-  return(dt)
-}
 
 
 #### VISUALISATION FUNCTIONS ####

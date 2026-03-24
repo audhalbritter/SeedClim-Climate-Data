@@ -430,6 +430,7 @@ step_normalise <- function(temperature, logger_recode = LOGGER_RECODE) {
   loggers_before <- sort(unique(temperature$logger))
 
   temperature[, flag        := NA_character_]
+  temperature[, proc_flag   := NA_character_]
   temperature[, logger_swap := NA_character_]
 
   temperature[logger == "", logger := "temp30cm"]
@@ -553,8 +554,9 @@ step_assign <- function(temperature) {
         message(
           "WARNING: ", nrow(suspicious),
           " file(s) still have var(soil) > var(above) \u00d7 1.25 after",
-          " auto-correction — likely too few observations for Pass 2",
-          " (requires \u226548 per channel). See output/variance_assignment_audit.csv."
+          " auto-correction (likely < 48 obs per channel for Pass 2).",
+          " Flagged proc_flag='SuspiciousAssignment'.",
+          " See output/variance_assignment_audit.csv."
         )
         print(
           var_post_wide[suspicious, on = .(site, file),
@@ -563,10 +565,10 @@ step_assign <- function(temperature) {
         )
         temperature[
           suspicious, on = .(site, file),
-          flag := data.table::fifelse(
-            is.na(flag),
-            "SuspiciousAssignment_SoilHigherVariance",
-            paste(flag, "SuspiciousAssignment_SoilHigherVariance", sep = "|")
+          proc_flag := data.table::fifelse(
+            is.na(proc_flag),
+            "SuspiciousAssignment",
+            paste(proc_flag, "SuspiciousAssignment", sep = "|")
           )
         ]
       } else {
@@ -726,7 +728,6 @@ step_assign <- function(temperature) {
 #' @return list: data, flag_summary, n_flagged, pct_flagged
 step_flag <- function(temperature) {
   temperature <- flag_outliers(temperature)
-  temperature <- flag_gaps(temperature)
 
   n_flagged   <- temperature[!is.na(flag), .N]
   pct_flagged <- round(n_flagged / nrow(temperature) * 100, 2)

@@ -262,37 +262,45 @@ in the project root when the pipeline is run.
 
 ## Flag vocabulary
 
-### `flag` — data quality
+Two flag columns are used.  Values within a column are pipe-separated (`|`)
+when multiple flags apply to the same row.
+
+### `flag` — automated data quality
+
+Set entirely by the automatic outlier detection in Step 7.  No manual flags.
+
+| Flag | Trigger |
+|------|---------|
+| `Outlier_Range` | Value outside physically plausible bounds (veg/unassigned: −40 to +50 °C; soil: −20 to +35 °C) |
+| `Outlier_RateOfChange` | Change > 5 °C between consecutive hourly readings |
+| `Outlier_IQR` | Outside Q1 − 3×IQR … Q3 + 3×IQR for the same site × logger × calendar month |
+
+Flagged rows are **retained** in the output.  Use `is.na(flag)` to filter for
+clean data only.
+
+### `proc_flag` — processing decisions
+
+Set during the soil/veg assignment (Steps 5–6).  Kept in a separate column so
+it does not pollute the quality filter.
 
 | Flag | Meaning |
 |------|---------|
-| `VarianceProblem_TooHigh` | Logger likely exposed to sun or not embedded in medium |
-| `VarianceProblem_TooLow` | Both sensors appear to be in the same medium (no contrast) |
-| `VarianceProblem_TooSimilar` | Variance ratio 0.80–1.25: could not determine soil/above; default assignment applied |
-| `SuspiciousAssignment_SoilHigherVariance` | var(soil) > var(above) × 1.25 after Pass 2; too few observations to auto-correct — needs manual review |
-| `Bias_Sensor` | Known systematic offset (e.g. Ovstedal temp2 post-2016) |
-| `Bias_IncreasingVarOverTime` | Known degradation of sensor insulation (Lavisdalen above-ground) |
-| `Bias_FewDataPoints` | Too few observations for reliable use (Skjellingahaugen 2012) |
-| `WrongValues_TooLow` | Values clearly too low to be physical (Hogsete 2015–2016) |
-| `Outlier_GlobalRange` | Outside physically plausible temperature range |
-| `Outlier_RateOfChange` | Change > 5 °C between consecutive hourly readings |
-| `Outlier_IQR` | Outside Q1 − 3×IQR … Q3 + 3×IQR for same site × logger × month |
-| `Missing_Gap` | Gap to next observation exceeds 72 hours |
-
-Multiple flags can apply to the same row; they are pipe-separated (`|`).
+| `AmbiguousAssignment` | Variance ratio 0.80–1.25; no manual override and no neighbour consensus → default assignment applied |
+| `SuspiciousAssignment` | var(tempsoil) > var(tempabove) × 1.25 after all corrections; likely too few observations for Pass 2 → needs manual review |
 
 ### `logger_swap` — assignment audit trail
 
-Documents every reassignment.  Examples:
+Records every logger re-assignment.  Multiple steps are pipe-separated.
 
 | Value | Meaning |
 |-------|---------|
 | `NA` | Original label kept, no change |
 | `ManualSwap: Fauske — temp1/thermistor2 always soil` | Tier 1 explicit override |
-| `AutoSwap_VarRatio:0.43 (temp1→soil)` | Tier 2 Pass 1: temp1 had lower variance |
-| `AutoOverride_VarRatio:1.43 — var(soil)>var(above), assignment reversed` | Tier 2 Pass 2 correction of an inverted manual assignment |
+| `AutoSwap_VarRatio:0.43 (temp1→soil)` | Tier 2 Pass 1: temp1 had clearly lower variance |
+| `AutoOverride_VarRatio:1.43 — var(soil)>var(above), assignment reversed` | Tier 2 Pass 2: inverted manual assignment corrected |
 | `NeighbourConsensus: prev & next both have temp1=tempsoil` | Tier 3 |
 | `DefaultAssign: single-channel file, no pair for variance test; temp1→veg_temp` | Tier 4 fallback |
+| `KnownIssue: Ovstedal temp2 systematic offset 2016-2017` | Known sensor issue noted here (not a quality flag) |
 
 ---
 
