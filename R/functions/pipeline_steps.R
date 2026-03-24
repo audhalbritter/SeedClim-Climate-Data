@@ -1,11 +1,62 @@
 ################################################################################
-# pipeline_steps.R
+# pipeline_steps.R  (R/functions/pipeline_steps.R)
 #
+# Purpose
+# -------
 # High-level step functions for the SeedClim climate data pipeline.
-# Each function handles one processing stage and returns the processed data
-# alongside diagnostic metadata used by pipeline_report.qmd.
+# Each function wraps one processing stage and returns both the processed data
+# and diagnostic metadata consumed by pipeline_report.qmd.
 #
-# Dependencies: R/functions/02_functions.R must be sourced first.
+# Entry point
+# -----------
+# Run the full pipeline by rendering the Quarto report:
+#   source("run_pipeline.R")          # calls quarto::quarto_render(...)
+# or directly:
+#   quarto::quarto_render("pipeline_report.qmd")
+#
+# Dependencies
+# ------------
+# R/functions/02_functions.R must be sourced before this file.
+#
+# Pipeline overview
+# -----------------
+# Step 1  step_import()       Read all .txt files; silent warning capture
+# Step 2  step_clean()        Trim warm-up rows, date filter, deduplication
+# Step 3  step_split()        Separate temperature / precipitation / soil moisture
+# Step 4  step_normalise()    Recode raw logger name variants → standard names
+# Steps 5+6 step_assign()     Four-tier soil/veg assignment (see below)
+# Step 7  step_flag()         Outlier detection and gap flagging
+# Step 8  step_finalise()     Final rename, hourly grid fill, CSV output
+#
+# Four-tier soil/veg assignment (step_assign)
+# -------------------------------------------
+# Tier 1 — Manual site overrides (apply_site_overrides): documented knowledge
+#           about logger placement per site/period; always takes precedence.
+# Tier 2 — Automated variance test Pass 1 (assign_soil_veg_loggers):
+#           for still-unassigned temp1/temp2 pairs, the channel with clearly
+#           lower variance → tempsoil; ratio must be outside 0.8–1.25.
+# Tier 3 — Neighbour consensus: if the chronologically adjacent files at the
+#           same site both agree on which channel was soil, adopt that.
+# Tier 4 — Default (step_finalise): temp1 → veg_temp, temp2 → soil_temp.
+#           Only files where all three earlier tiers were inconclusive reach
+#           this fallback; they are flagged VarianceProblem_TooSimilar.
+#
+# Additionally, assign_soil_veg_loggers() runs a Pass 2 after all assignments:
+# it re-checks every tempsoil/tempabove pair and auto-corrects any where
+# var(tempsoil)/var(tempabove) > 1.25 (clearly inverted), appending an
+# AutoOverride note to logger_swap.
+#
+# Traceability columns
+# --------------------
+# logger_swap — records every logger re-assignment with a human-readable reason:
+#   ManualSwap: <site> — <reason>
+#   AutoSwap_VarRatio:<ratio> (temp1→soil)
+#   AutoOverride_VarRatio:<ratio> — var(soil)>var(above), assignment reversed
+#   NeighbourConsensus: prev & next both have temp1=<tempsoil|tempabove>
+#   DefaultAssign: single-channel file, no pair for variance test
+#
+# flag — pipe-separated data quality flags; NA = clean.  See README.Rmd for
+#        the full flag vocabulary.
 ################################################################################
 
 
@@ -403,12 +454,28 @@ step_normalise <- function(temperature, logger_recode = LOGGER_RECODE) {
 }
 
 
-#' Steps 5 + 6: Manual site overrides + automated variance-based assignment
+#' Steps 5 + 6: Four-tier soil/veg temperature assignment
 #'
-#' Includes a pre-assignment variance snapshot (ground truth) and a
-#' post-assignment audit that flags pairs where var(soil) > var(above).
+#' Orchestrates all four tiers of the assignment ladder in order:
 #'
-#' @return list: data, var_pre_wide, var_post_wide, suspicious, n_manual
+#' 1. \code{apply_site_overrides()} — manual, site-specific knowledge.
+#' 2. \code{assign_soil_veg_loggers()} Pass 1 — variance ratio for remaining
+#'    temp1/temp2 pairs (ratio outside 0.80–1.25 required).
+#' 3. Neighbour consensus — if the previous and next assigned file at the same
+#'    site both agree on temp1's role, adopt that assignment and record it as
+#'    \code{NeighbourConsensus} in \code{logger_swap}.
+#' 4. Default (handled in \code{step_finalise}) — temp1 → veg_temp,
+#'    temp2 → soil_temp, flagged \code{VarianceProblem_TooSimilar}.
+#'
+#' A pre-assignment variance snapshot is captured before any changes to serve
+#' as an objective statistical reference.  After all assignments, Pass 2 of
+#' \code{assign_soil_veg_loggers()} re-checks every tempsoil/tempabove pair
+#' and auto-corrects inverted assignments (ratio > 1.25).  A post-assignment
+#' audit then flags any pairs that remain inverted (typically due to too few
+#' observations for Pass 2 to act).
+#'
+#' @return list: data, var_pre_wide, var_post_wide, suspicious, n_manual,
+#'   unassigned_files
 step_assign <- function(temperature) {
 
   # Pre-assignment variance snapshot (objective reference, unaffected by overrides)
@@ -473,15 +540,21 @@ step_assign <- function(temperature) {
         )
       }
 
+      # Use the same threshold as Pass 2 (1.25) so the flag only fires for
+      # files that Pass 2 genuinely could not auto-correct — most likely
+      # because one channel had fewer than MIN_OBS (48) observations.
+      # Files with ratio 1.0–1.25 are not flagged: the difference is too
+      # small to be certain the assignment is wrong.
       suspicious <- var_post_wide[
-        !is.na(var_ratio_assigned) & var_ratio_assigned > 1.0, .(site, file)
+        !is.na(var_ratio_assigned) & var_ratio_assigned > 1.25, .(site, file)
       ]
 
       if (nrow(suspicious) > 0L) {
         message(
           "WARNING: ", nrow(suspicious),
-          " file(s) have var(soil) > var(above) after assignment",
-          " \u2014 see output/variance_assignment_audit.csv"
+          " file(s) still have var(soil) > var(above) \u00d7 1.25 after",
+          " auto-correction — likely too few observations for Pass 2",
+          " (requires \u226548 per channel). See output/variance_assignment_audit.csv."
         )
         print(
           var_post_wide[suspicious, on = .(site, file),
@@ -499,7 +572,7 @@ step_assign <- function(temperature) {
       } else {
         message(
           "Post-assignment check passed: ",
-          "soil variance < above-ground variance in all assigned pairs."
+          "all assigned pairs have var(soil) \u2264 var(above) \u00d7 1.25."
         )
         suspicious <- NULL
       }
@@ -511,27 +584,139 @@ step_assign <- function(temperature) {
     }
   }
 
-  # Warn about any still-unassigned ambiguous names
-  remaining <- temperature[
+  # Collect any still-unassigned ambiguous logger names
+  unassigned_files <- temperature[
     logger %in% c("temp1", "temp2", "thermistor 1", "thermistor 2",
-                  "temperature", "temperature2")
-  ]
-  if (nrow(remaining) > 0L) {
+                  "temperature", "temperature2"),
+    .N, by = .(site, file, logger)
+  ][order(site, file, logger)]
+
+  if (nrow(unassigned_files) > 0L) {
     message(
-      "WARNING: ", format(nrow(remaining), big.mark = ","),
-      " rows still have unassigned logger names:"
+      "WARNING: ", nrow(unassigned_files),
+      " site/file/logger combination(s) still have unassigned logger names.",
+      " Variance ratio was too ambiguous (0.8-1.25) and no manual override exists.",
+      " These will receive a default assignment in Step 8."
     )
-    print(remaining[, .N, by = .(site, logger, file)][order(site, logger)])
+
+    # For each unassigned file, look at the chronologically adjacent assigned
+    # files at the same site and report how temp1 was assigned there.
+    # This helps decide whether the ambiguous file is likely consistent with
+    # its neighbours (but note: loggers are sometimes physically swapped
+    # between downloads, so treat this as a hint, not a certainty).
+
+    # Date range per file (for all files at that site)
+    file_dates <- temperature[
+      !is.na(date),
+      .(file_start = min(date), file_end = max(date)),
+      by = .(site, file)
+    ]
+
+    # For assigned files, extract what the original temp1 channel became.
+    # logger_swap entries like "AutoSwap... (temp1->soil)" or
+    # "ManualSwap: ... temp1..." identify temp1-origin rows.
+    temp1_history <- temperature[
+      logger %in% c("tempsoil", "tempabove") &
+        !is.na(logger_swap) & grepl("temp1", logger_swap, fixed = TRUE),
+      .(temp1_became = logger[1L]),
+      by = .(site, file)
+    ]
+    temp1_history <- merge(temp1_history, file_dates, by = c("site", "file"))
+
+    # Unique unassigned (site, file) pairs with their date ranges
+    ua_files <- unique(unassigned_files[, .(site, file)])
+    ua_files  <- merge(ua_files, file_dates, by = c("site", "file"), all.x = TRUE)
+
+    context <- rbindlist(lapply(seq_len(nrow(ua_files)), function(i) {
+      s      <- ua_files$site[i]
+      f      <- ua_files$file[i]
+      u_start <- ua_files$file_start[i]
+      u_end   <- ua_files$file_end[i]
+
+      neighbours <- temp1_history[site == s]
+
+      prev_row <- neighbours[file_end <= u_start][
+        order(-file_end)
+      ][1L, .(prev_file = file, prev_temp1_as = temp1_became)]
+
+      next_row <- neighbours[file_start >= u_end][
+        order(file_start)
+      ][1L, .(next_file = file, next_temp1_as = temp1_became)]
+
+      if (nrow(prev_row) == 0L || is.na(prev_row$prev_file))
+        prev_row <- data.table(prev_file = NA_character_,
+                               prev_temp1_as = NA_character_)
+      if (nrow(next_row) == 0L || is.na(next_row$next_file))
+        next_row <- data.table(next_file = NA_character_,
+                               next_temp1_as = NA_character_)
+
+      data.table(site = s, file = f, prev_row, next_row)
+    }))
+
+    unassigned_files <- merge(unassigned_files, context,
+                              by = c("site", "file"), all.x = TRUE)
+
+    # Auto-assign files where both neighbours agree on temp1's role.
+    # If prev and next both say "tempsoil", temp1 is soil here too, and
+    # vice versa.  Files where neighbours disagree (or one is missing)
+    # are left for the default assignment in Step 8.
+    consensus <- context[
+      !is.na(prev_temp1_as) & !is.na(next_temp1_as) &
+        prev_temp1_as == next_temp1_as,
+      .(site, file, temp1_as = prev_temp1_as)
+    ]
+
+    if (nrow(consensus) > 0L) {
+      message(
+        "  Neighbour-consensus assignment: resolving ",
+        nrow(consensus), " file(s) where prev and next agree on temp1 role."
+      )
+
+      for (i in seq_len(nrow(consensus))) {
+        s        <- consensus$site[i]
+        f        <- consensus$file[i]
+        t1_role  <- consensus$temp1_as[i]          # "tempsoil" or "tempabove"
+        t2_role  <- if (t1_role == "tempsoil") "tempabove" else "tempsoil"
+        swap_msg <- paste0(
+          "NeighbourConsensus: prev & next both have temp1=", t1_role
+        )
+
+        temperature[site == s & file == f & logger == "temp1",
+                    `:=`(logger      = t1_role,
+                         logger_swap = swap_msg)]
+        temperature[site == s & file == f & logger == "temp2",
+                    `:=`(logger      = t2_role,
+                         logger_swap = swap_msg)]
+      }
+
+      # Remove the now-resolved files from unassigned_files
+      unassigned_files <- unassigned_files[
+        !consensus, on = c("site", "file")
+      ]
+
+      if (nrow(unassigned_files) == 0L) {
+        message("  All previously unassigned files resolved by neighbour consensus.")
+      }
+    }
+
+    if (nrow(unassigned_files) > 0L) {
+      message(
+        "  ", nrow(unassigned_files),
+        " file(s) remain unassigned (neighbours disagree or missing).",
+        " Default assignment will be applied in Step 8."
+      )
+    }
   } else {
     message("All ambiguous logger names have been assigned.")
   }
 
   list(
-    data          = temperature,
-    var_pre_wide  = var_pre_wide,
-    var_post_wide = var_post_wide,
-    suspicious    = suspicious,
-    n_manual      = n_manual
+    data             = temperature,
+    var_pre_wide     = var_pre_wide,
+    var_post_wide    = var_post_wide,
+    suspicious       = suspicious,
+    n_manual         = n_manual,
+    unassigned_files = unassigned_files
   )
 }
 

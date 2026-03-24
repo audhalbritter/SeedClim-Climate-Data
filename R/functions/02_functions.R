@@ -1,12 +1,44 @@
-####################################
-# SEEDCLIM CLIMATE DATA
-#   FUNCTIONS v2 (2025)
-####################################
+################################################################################
+# SEEDCLIM CLIMATE DATA — HELPER FUNCTIONS  (R/functions/02_functions.R)
 #
-# Updated from: Functions_ReadInSeedClimClimateData.R (original, left untouched)
+# Purpose
+# -------
+# Lower-level functions for reading, parsing, cleaning, and plotting individual
+# climate data files.  Called by the high-level step functions in
+# R/functions/pipeline_steps.R, which in turn are called by pipeline_report.qmd.
+#
+# Original script: Functions_ReadInSeedClimClimateData.R  (left untouched)
+#
+# Key changes vs. original
+# ------------------------
+#  - Modernised syntax: pivot_longer, across, dmy_hms, ymd_hms
+#  - data.table output from all read functions (rbindlist()-safe)
+#  - NULL-safe file assignment in ReadData()
+#  - NameCheck(): dual-iconv strategy (UTF-8 + latin1 fallback) so that
+#    Norwegian characters (å/ø/æ) are matched regardless of how the calling
+#    string was encoded; patterns also accept plain ASCII spellings.
+#  - ReadInBodyITAS(): handles ITAS files that have extra unnamed columns
+#    (double-tab after "Label" header) by renaming them to X2/X3 before
+#    dplyr operations and dropping auxiliary columns afterward.
+#    Also walks the directory tree if the filename does not contain a
+#    recognisable site name (site rescued from folder path).
+#  - ReadInBodyUTL(): robust encoding detection (UTF-8 probe → latin1
+#    fallback), Windows line-ending normalisation (\r stripping), Location
+#    field lookup by name rather than fixed row index, and a serial-number
+#    lookup table for files whose Location/Name header fields are blank.
+#  - assign_soil_veg_loggers():
+#      Pass 1 — assigns still-unassigned temp1/temp2 pairs by variance ratio.
+#      Pass 2 — re-checks ALL assigned tempsoil/tempabove pairs (including
+#               manually assigned ones) and auto-corrects any where
+#               var(tempsoil) > var(tempabove) × 1.25.
+#  - apply_site_overrides(): all per-site manual corrections encoded here;
+#    every change written to logger_swap for full auditability.
+#  - flag_outliers(): global range, rate-of-change, monthly IQR checks.
+#  - flag_gaps(): marks gaps > 72 h in the cleaned time series.
+#  - plot_*() functions: diagnostic visualisations used in pipeline_report.qmd.
+################################################################################
 
-# Suppress R CMD CHECK / lintr "no visible binding" notes that arise from
-# data.table's non-standard evaluation. These are false positives.
+# Suppress R CMD CHECK / lintr "no visible binding" notes from data.table NSE.
 utils::globalVariables(c(
   ".", ".N", ".SD",
   "Label", "X1", "X2",
@@ -20,16 +52,6 @@ utils::globalVariables(c(
   "roll_med", "roll_mad",
   "swapped_by_variance"
 ))
-#
-# Key changes vs. original:
-#   - Modernised syntax: pivot_longer, across, as_tibble, tibble (no deprecated calls)
-#   - data.table output from all read functions; rbindlist()-safe
-#   - NULL-safe file assignment in ReadData()
-#   - New: assign_soil_veg_loggers() — variance-ratio-based soil/veg detection
-#   - New: apply_site_overrides()    — all per-site manual fixes, documented in logger_swap
-#   - New: flag_outliers()           — rate-of-change, global range, monthly IQR
-#   - New: flag_gaps()               — marks long data gaps
-#   - New: plot_*() functions        — diagnostic visualisation
 
 
 #### NAME CHECK ####
@@ -418,93 +440,178 @@ ReadInBodyUTL <- function(textfile) {
 
 
 #### ASSIGN SOIL vs VEG TEMPERATURE LOGGERS ####
+#
 # Determines which of temp1/temp2 is soil (lower variance) and which is
-# above-ground (higher variance) using a per-site × per-file variance ratio test.
+# above-ground (higher variance) using a per-site × per-file variance ratio:
 #
-# Runs AFTER apply_site_overrides() so it only processes files where the
-# assignment is not already documented.
+#   ratio = var(temp1) / var(temp2)
+#   ratio < LOW_THRESH  (0.80) → temp1 is soil, temp2 is above-ground
+#   ratio > HIGH_THRESH (1.25) → temp2 is soil, temp1 is above-ground
+#   0.80 ≤ ratio ≤ 1.25       → ambiguous; flag VarianceProblem_TooSimilar
 #
-# Documents every assignment in the logger_swap column:
-#   AutoSwap_VarRatio:0.43 (temp1→soil)  = automated, temp1 had lower variance
-#   AutoSwap_VarRatio:2.10 (temp2→soil)  = automated, temp2 had lower variance
+# Two passes are run:
+#
+#   Pass 1 — processes rows still named temp1/temp2 after apply_site_overrides().
+#            Requires both channels to have ≥ MIN_OBS (48) valid observations.
+#
+#   Pass 2 — re-checks ALL assigned tempsoil/tempabove pairs (including those
+#            assigned by manual overrides).  If var(tempsoil)/var(tempabove)
+#            exceeds HIGH_THRESH (1.25) after assignment, the assignment is
+#            clearly inverted and is automatically corrected.  The original
+#            manual assignment reason is preserved in logger_swap and the
+#            override is appended ("; AutoOverride_VarRatio:...").
+#
+# logger_swap values written by this function:
+#   AutoSwap_VarRatio:0.43 (temp1→soil)   — Pass 1, temp1 had lower variance
+#   AutoSwap_VarRatio:2.10 (temp2→soil)   — Pass 1, temp2 had lower variance
+#   AutoOverride_VarRatio:1.43 — var(soil)>var(above), assignment reversed
+#                                           — Pass 2 correction
 
 assign_soil_veg_loggers <- function(dt) {
 
-  MIN_OBS    <- 48    # minimum observations for a reliable variance estimate
-  LOW_THRESH <- 0.8   # var_ratio < LOW_THRESH  → temp1 is soil
-  HIGH_THRESH <- 1.25 # var_ratio > HIGH_THRESH → temp2 is soil
+  MIN_OBS     <- 48    # minimum observations for a reliable variance estimate
+  LOW_THRESH  <- 0.8   # var(temp1)/var(temp2) < LOW_THRESH  → temp1 is soil
+  HIGH_THRESH <- 1.25  # var(temp1)/var(temp2) > HIGH_THRESH → temp2 is soil
+  # Same threshold used when re-checking already-assigned pairs:
+  # var(tempsoil)/var(tempabove) > HIGH_THRESH → soil has higher variance
+  # than above-ground, meaning the current assignment is inverted.
 
   if (!"logger_swap" %in% names(dt)) dt[, logger_swap := NA_character_]
 
-  # Compute variance per site × file for all remaining temp1/temp2 pairs
+  # ------------------------------------------------------------------
+  # Pass 1: assign still-unassigned temp1/temp2 pairs by variance
+  # ------------------------------------------------------------------
   var_dt <- dt[logger %in% c("temp1", "temp2") & !is.na(value),
                .(var_val = var(value, na.rm = TRUE),
                  n_obs   = sum(!is.na(value))),
                by = .(site, file, logger)]
 
-  # Only use files where BOTH loggers have enough data
   both_present <- var_dt[, .N, by = .(site, file)][N == 2, .(site, file)]
-  var_dt <- var_dt[both_present, on = .(site, file)]
-  var_dt <- var_dt[n_obs >= MIN_OBS]
+  var_dt <- var_dt[both_present, on = .(site, file)][n_obs >= MIN_OBS]
 
-  if (nrow(var_dt) == 0) {
-    message("  No temp1/temp2 pairs found for automated assignment.")
-    return(dt)
+  if (nrow(var_dt) > 0L) {
+    var_wide <- data.table::dcast(var_dt, site + file ~ logger, value.var = "var_val")
+    var_wide <- var_wide[!is.na(temp1) & !is.na(temp2)]
+    var_wide[, var_ratio := temp1 / temp2]
+    var_wide[, assignment := data.table::fcase(
+      var_ratio < LOW_THRESH,  "temp1_is_soil",
+      var_ratio > HIGH_THRESH, "temp2_is_soil",
+      default = "ambiguous"
+    )]
+
+    dt <- merge(dt, var_wide[, .(site, file, var_ratio, assignment)],
+                by = c("site", "file"), all.x = TRUE)
+
+    dt[logger == "temp1" & assignment == "temp1_is_soil",
+       `:=`(logger      = "tempsoil",
+            logger_swap = paste0("AutoSwap_VarRatio:", round(var_ratio, 2),
+                                 " (temp1\u2192soil)"))]
+    dt[logger == "temp2" & assignment == "temp1_is_soil",
+       `:=`(logger      = "tempabove",
+            logger_swap = paste0("AutoSwap_VarRatio:", round(var_ratio, 2),
+                                 " (temp2\u2192above)"))]
+    dt[logger == "temp1" & assignment == "temp2_is_soil",
+       `:=`(logger      = "tempabove",
+            logger_swap = paste0("AutoSwap_VarRatio:", round(var_ratio, 2),
+                                 " (temp1\u2192above)"))]
+    dt[logger == "temp2" & assignment == "temp2_is_soil",
+       `:=`(logger      = "tempsoil",
+            logger_swap = paste0("AutoSwap_VarRatio:", round(var_ratio, 2),
+                                 " (temp2\u2192soil)"))]
+
+    dt[logger %in% c("temp1", "temp2") & assignment == "ambiguous",
+       flag := data.table::fifelse(
+         is.na(flag), "VarianceProblem_TooSimilar",
+         paste(flag, "VarianceProblem_TooSimilar", sep = "|"))]
+
+    dt[, c("var_ratio", "assignment") := NULL]
+
+    n_auto <- dt[!is.na(logger_swap) & grepl("AutoSwap", logger_swap), .N]
+    message("  Pass 1 — automated variance assignment: ", n_auto, " rows assigned")
+  } else {
+    message("  Pass 1 — no unassigned temp1/temp2 pairs found.")
   }
 
-  var_wide <- data.table::dcast(var_dt, site + file ~ logger, value.var = "var_val")
-  var_wide <- var_wide[!is.na(temp1) & !is.na(temp2)]
-  var_wide[, var_ratio := temp1 / temp2]
+  # ------------------------------------------------------------------
+  # Pass 2: re-check ALL assigned tempsoil/tempabove pairs (including
+  # manually-assigned ones).  If var(tempsoil) > var(tempabove) by the
+  # same HIGH_THRESH, the assignment is clearly inverted — auto-correct
+  # and append a note to logger_swap so the override is fully traceable.
+  # ------------------------------------------------------------------
+  post_var <- dt[
+    logger %in% c("tempsoil", "tempabove") & !is.na(value),
+    .(var_val = var(value, na.rm = TRUE), n_obs = sum(!is.na(value))),
+    by = .(site, file, logger)
+  ]
+  both_assigned <- post_var[, .N, by = .(site, file)][N == 2, .(site, file)]
+  post_var <- post_var[both_assigned, on = .(site, file)][n_obs >= MIN_OBS]
 
-  var_wide[, assignment := data.table::fcase(
-    var_ratio < LOW_THRESH,   "temp1_is_soil",
-    var_ratio > HIGH_THRESH,  "temp2_is_soil",
-    default = "ambiguous"
-  )]
+  if (nrow(post_var) > 0L) {
+    post_wide <- data.table::dcast(
+      post_var, site + file ~ logger, value.var = "var_val"
+    )
+    post_wide <- post_wide[!is.na(tempsoil) & !is.na(tempabove)]
+    post_wide[, var_ratio_post := tempsoil / tempabove]
 
-  # Merge recommendations back (all.x keeps rows without a recommendation)
-  dt <- merge(dt, var_wide[, .(site, file, var_ratio, assignment)],
-              by = c("site", "file"), all.x = TRUE)
+    # Files where soil clearly has higher variance than above → swap back
+    to_correct <- post_wide[var_ratio_post > HIGH_THRESH,
+                             .(site, file, var_ratio_post)]
 
-  # Apply: temp1 has lower variance → temp1 = soil, temp2 = above
-  dt[logger == "temp1" & assignment == "temp1_is_soil",
-     `:=`(logger      = "tempsoil",
-          logger_swap = paste0("AutoSwap_VarRatio:", round(var_ratio, 2),
-                               " (temp1\u2192soil)"))]
-  dt[logger == "temp2" & assignment == "temp1_is_soil",
-     `:=`(logger      = "tempabove",
-          logger_swap = paste0("AutoSwap_VarRatio:", round(var_ratio, 2),
-                               " (temp2\u2192above)"))]
+    if (nrow(to_correct) > 0L) {
+      message(
+        "  Pass 2 — auto-correcting ", nrow(to_correct),
+        " file(s) where var(tempsoil) > var(tempabove) \u00d7 ", HIGH_THRESH,
+        " (manual assignment overridden by variance test)"
+      )
 
-  # Apply: temp2 has lower variance → temp2 = soil, temp1 = above
-  dt[logger == "temp1" & assignment == "temp2_is_soil",
-     `:=`(logger      = "tempabove",
-          logger_swap = paste0("AutoSwap_VarRatio:", round(var_ratio, 2),
-                               " (temp1\u2192above)"))]
-  dt[logger == "temp2" & assignment == "temp2_is_soil",
-     `:=`(logger      = "tempsoil",
-          logger_swap = paste0("AutoSwap_VarRatio:", round(var_ratio, 2),
-                               " (temp2\u2192soil)"))]
+      dt <- merge(dt, to_correct, by = c("site", "file"), all.x = TRUE)
 
-  # Flag ambiguous pairs (leave names as temp1/temp2 for manual review)
-  dt[logger %in% c("temp1", "temp2") & assignment == "ambiguous",
-     flag := data.table::fifelse(
-       is.na(flag), "VarianceProblem_TooSimilar",
-       paste(flag, "VarianceProblem_TooSimilar", sep = "|"))]
+      # Swap tempsoil ↔ tempabove simultaneously (data.table evaluates RHS
+      # from the current column values before writing, so both sides are safe)
+      dt[!is.na(var_ratio_post) & logger %in% c("tempsoil", "tempabove"),
+         `:=`(
+           logger = data.table::fifelse(
+             logger == "tempsoil", "tempabove", "tempsoil"
+           ),
+           logger_swap = paste0(
+             data.table::fifelse(
+               is.na(logger_swap), "",
+               paste0(logger_swap, "; ")
+             ),
+             "AutoOverride_VarRatio:", round(var_ratio_post, 2),
+             " \u2014 var(soil)>var(above), assignment reversed by variance test"
+           )
+         )]
 
-  dt[, c("var_ratio", "assignment") := NULL]
-
-  n_assigned <- dt[!is.na(logger_swap) & grepl("AutoSwap", logger_swap), .N]
-  message("  Automated variance assignment: ", n_assigned, " rows assigned")
+      dt[, var_ratio_post := NULL]
+    } else {
+      message("  Pass 2 — all assigned pairs confirmed correct by variance test.")
+    }
+  }
 
   return(dt)
 }
 
 
 #### APPLY PER-SITE MANUAL OVERRIDES ####
-# Ports all manual fixes from ReadInSeedClimClimateData.R.
-# Runs BEFORE assign_soil_veg_loggers() so documented knowledge takes precedence.
-# Every logger change is recorded in logger_swap with a human-readable reason.
+#
+# First tier of the four-tier soil/veg assignment ladder.  Applies all
+# documented, site-specific knowledge about logger placement.
+#
+# Runs BEFORE assign_soil_veg_loggers() so explicit knowledge always takes
+# precedence over the statistical test.
+#
+# Two types of changes are made:
+#   1. Logger re-assignment: temp1/temp2 → tempsoil/tempabove for known sites.
+#      Every change is recorded in logger_swap with a human-readable reason,
+#      e.g. "ManualSwap: Fauske — temp1/thermistor2 always soil".
+#   2. Data quality flags and NA-ification: values that are physically
+#      implausible or known to be wrong are either removed (value := NA) or
+#      flagged in the flag column without removal.
+#
+# Note: assign_soil_veg_loggers() Pass 2 will still re-check these assignments
+# and auto-correct if var(tempsoil) > var(tempabove) × 1.25, appending an
+# AutoOverride note to logger_swap so the correction is fully traceable.
 
 apply_site_overrides <- function(dt) {
 
