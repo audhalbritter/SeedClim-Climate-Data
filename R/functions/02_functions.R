@@ -621,12 +621,20 @@ apply_site_overrides <- function(dt) {
 
   # ===== FAUSKE =====
   # temp1 and thermistor 2 are ALWAYS soil; temp2 and thermistor 1 are ALWAYS above.
-  # Bad data: remove temp1 for mid-2013 – Oct 2014 (logger not in soil)
+  # Bad data: remove temp1 for mid-2013 - Oct 2014 (logger not in soil)
   dt[site == "fau" &
        file %in% c("Fauske_ITAS_13.6.6-13.9.22.txt",
                    "Fauske_ITAS_13.9.22-14.5.14.txt",
                    "Fauske_ITAS_14.5.14-14.10.14.txt") &
        logger == "temp1",
+     value := NA_real_]
+
+  # Issue #1: Fauske 2013-2014 appears physically wrong (soil hit floor;
+  # above-ground channel offset too low). Discard both channels entirely.
+  dt[site == "fau" &
+       date >= as.POSIXct("2013-01-01", tz = "Africa/Algiers") &
+       date <= as.POSIXct("2014-12-31 23:00:00", tz = "Africa/Algiers") &
+       logger %in% c("temp1", "temp2", "thermistor 1", "thermistor 2"),
      value := NA_real_]
 
   dt[site == "fau" & logger %in% c("temp1", "thermistor 2"),
@@ -637,18 +645,18 @@ apply_site_overrides <- function(dt) {
           logger_swap = "ManualSwap: Fauske — temp2/thermistor1 always above")]
 
   # CORRECTION for the extra logger deployed in spring 2016:
-  # temp1 reaches 29–37 °C in May — clearly an above-ground sensor in direct
+  # temp1 reaches 29-37 °C in May — clearly an above-ground sensor in direct
   # sun, not soil. temp2 (~15 °C) is soil. The site-wide rule above is wrong
   # for this file; overwrite it here (this runs after, so it takes precedence).
   dt[file == "20160706_Fauske_ekstra_logger_met1.txt" & logger == "tempsoil",
      `:=`(logger      = "tempabove",
-          logger_swap = "ManualSwap: Fauske extra 2016 — CORRECTION temp1 above-ground (29-37\u00b0C); overrides site-wide rule")]
+          logger_swap = "ManualSwap: Fauske extra 2016 — temp1 above-ground (29-37\u00b0C)")]
   dt[file == "20160706_Fauske_ekstra_logger_met1.txt" & logger == "tempabove",
      `:=`(logger      = "tempsoil",
-          logger_swap = "ManualSwap: Fauske extra 2016 — CORRECTION temp2 is soil (~15\u00b0C); overrides site-wide rule")]
+          logger_swap = "ManualSwap: Fauske extra 2016 — temp2 is soil (~15\u00b0C)")]
 
   # ===== VIKESLAND =====
-  # Remove physically implausible low values Oct–Dec 2018
+  # Remove physically implausible low values Oct-Dec 2018
   dt[site == "vik" &
        date > as.POSIXct("2018-10-01", tz = "Africa/Algiers") &
        date < as.POSIXct("2019-01-01", tz = "Africa/Algiers") &
@@ -840,22 +848,35 @@ apply_site_overrides <- function(dt) {
   )
   dt[site == "skj" & file %in% skj_swap_files & logger == "temp1",
      `:=`(logger      = "tempsoil",
-          logger_swap = "ManualSwap: Skjellingahaugen — temp1\u2192soil (2014\u20132017 download files)")]
+          logger_swap = "ManualSwap: Skjellingahaugen temp1\u2192soil (2014\u20132017)")]
   dt[site == "skj" & file %in% skj_swap_files & logger == "temp2",
      `:=`(logger      = "tempabove",
-          logger_swap = "ManualSwap: Skjellingahaugen — temp2\u2192above (2014\u20132017 download files)")]
+          logger_swap = "ManualSwap: Skjellingahaugen temp2\u2192above (2014\u20132017)")]
 
   dt[site == "skj" &
        logger %in% c("temp200cm", "temp30cm") &
        date < as.POSIXct("2009-06-25", tz = "Africa/Algiers"),
      value := NA_real_]
 
+  # Issue #2: Skjellingahaugen shows switched soil/above in 2022-2025.
+  # Correct the mapping: temp1 -> soil, temp2 -> above for that period.
+  dt[site == "skj" &
+       date >= as.POSIXct("2022-01-01", tz = "Africa/Algiers") &
+       logger == "temp1",
+     `:=`(logger      = "tempsoil",
+          logger_swap = "ManualSwap: Skjellingahaugen 2022+ temp1->soil")]
+  dt[site == "skj" &
+       date >= as.POSIXct("2022-01-01", tz = "Africa/Algiers") &
+       logger == "temp2",
+     `:=`(logger      = "tempabove",
+          logger_swap = "ManualSwap: Skjellingahaugen 2022+ temp2->above")]
+
   dt[site == "skj" &
        logger %in% c("temperature", "temperature2") &
        lubridate::year(date) == 2019,
      value := NA_real_]
 
-  # Year-based rule for 2015–2017 (catches any remaining temp1/temp2)
+  # Year-based rule for 2015-2017 (catches any remaining temp1/temp2)
   dt[site == "skj" &
        lubridate::year(date) %in% c(2015, 2016, 2017) &
        logger == "temp1",
@@ -1060,7 +1081,7 @@ plot_timeseries_veg_soil <- function(dt) {
     ) +
     ggplot2::labs(
       title    = "Above-ground and soil temperature",
-      subtitle = "Rows: habitat (temperature gradient). Columns: mean annual precipitation (30-yr normal).",
+      subtitle = "Rows: habitat (temp gradient). Cols: mean annual precip (mm, 30-yr normal).",
       x        = NULL,
       y        = "Temperature (\u00b0C)",
       colour   = NULL
@@ -1088,7 +1109,7 @@ plot_timeseries_deep <- function(dt) {
     ) +
     ggplot2::labs(
       title    = "Deep temperature loggers (30 cm and 200 cm)",
-      subtitle = "Rows: habitat (temperature gradient). Columns: mean annual precipitation (30-yr normal).",
+      subtitle = "Rows: habitat (temp gradient). Cols: mean annual precip (mm, 30-yr normal).",
       x        = NULL,
       y        = "Temperature (\u00b0C)",
       colour   = NULL

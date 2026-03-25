@@ -795,6 +795,45 @@ step_finalise <- function(
     default = logger
   )]
 
+  # ===== SKJELLINGAHAUGEN: correct swapped soil/above in 2022–2025 =====
+  # In the problematic period, the deployment appears to have the soil and
+  # above-ground channels exchanged for the main download file.
+  # We swap the final logger names so `veg_temp` is above-ground and
+  # `soil_temp` is soil for this interval.
+  # Based on the veg-soil sign change pattern, the logger swap appears to
+  # start around Aug 2022 and stop around Jun 2023.
+  swap_note <- "ManualSwap: Skjellingahaugen Aug2022–Jun2023 — veg_temp<->soil_temp corrected"
+  temperature[site == "skj" &
+                 file == "Skjellingahaugen.txt" &
+                 date >= as.POSIXct("2022-08-01", tz = "Africa/Algiers") &
+                 date <= as.POSIXct("2023-06-30 23:00:00", tz = "Africa/Algiers") &
+                 logger %in% c("veg_temp", "soil_temp"),
+               `:=`(logger = data.table::fifelse(
+                 logger == "veg_temp", "soil_temp", "veg_temp"
+               ),
+               logger_swap = data.table::fifelse(
+                 is.na(logger_swap) | logger_swap == "", swap_note,
+                 paste0(logger_swap, "; ", swap_note)
+               ))]
+
+  # ===== LAVISDALEN: swap in-file logger mix-up (2021) =====
+  # For `Låvisdalen_met1.txt`, the final soil/above mapping appears inverted
+  # for 2021. Swap final logger names so `veg_temp` = above-ground and
+  # `soil_temp` = soil for this specific period/file.
+  lav_swap_note <- "ManualSwap: Lavisdalen Låvisdalen_met1 2021 — veg_temp<->soil_temp corrected"
+  temperature[site == "lav" &
+                 file == "Låvisdalen_met1.txt" &
+                 date >= as.POSIXct("2021-01-01", tz = "Africa/Algiers") &
+                 date <= as.POSIXct("2021-12-31 23:00:00", tz = "Africa/Algiers") &
+                 logger %in% c("veg_temp", "soil_temp"),
+               `:=`(logger = data.table::fifelse(
+                 logger == "veg_temp", "soil_temp", "veg_temp"
+               ),
+               logger_swap = data.table::fifelse(
+                 is.na(logger_swap) | logger_swap == "", lav_swap_note,
+                 paste0(logger_swap, "; ", lav_swap_note)
+               ))]
+
   data.table::setkey(temperature, site, date)
   temperature <- temperature[, .SD[seq_len(.N) > 30L], by = site]
 
