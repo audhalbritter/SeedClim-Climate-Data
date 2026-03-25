@@ -6,17 +6,25 @@
 # Example code in package build process
 *-Ex.R
 *.DS_Store
+
 # RStudio files
 .Rproj.user/
 .Rbuildignore
+
 # produced vignettes
 vignettes/*.html
 vignettes/*.pdf
+
 # OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
 .httr-oauth
 .Rproj.user
+
 # markdown cache
 *_cache/
+
+# vscode settings
+.vscode/
+
 # figures
 *.jpg
 *.gif
@@ -36,6 +44,7 @@ vignettes/*.pdf
 *.sql
 
 #binary datafiles
+data/
 *.xls
 *.xlsx
 *.mdb
